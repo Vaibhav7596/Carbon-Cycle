@@ -17,7 +17,15 @@ import { ImpactReportModal } from './components/reports/ImpactReportModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Facility, WasteLot, WasteStatus } from './types';
-import { getStoredFacilities, getStoredWasteLots, matchAndSelectFacilityForLot, resetDemoData, updateLotLifecycleStatus } from './services/store';
+import {
+  fetchFacilitiesApi,
+  fetchWasteLotsApi,
+  getStoredFacilities,
+  getStoredWasteLots,
+  matchAndSelectFacilityApi,
+  resetDemoDataApi,
+  updateLotLifecycleStatusApi,
+} from './services/store';
 
 function AppContent() {
   const { isAuthenticated, user, setAuthModalOpen } = useAuth();
@@ -33,11 +41,27 @@ function AppContent() {
   const [openReportLot, setOpenReportLot] = useState<WasteLot | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Load state on initial mount
+  // Load state on initial mount & synchronize with MongoDB
   useEffect(() => {
+    // Initial instant hydration from local cache
     setWasteLots(getStoredWasteLots());
     setFacilities(getStoredFacilities());
-  }, []);
+
+    async function loadLiveDatabase() {
+      try {
+        const [liveLots, liveFacilities] = await Promise.all([
+          fetchWasteLotsApi(),
+          fetchFacilitiesApi(),
+        ]);
+        if (liveLots && liveLots.length > 0) setWasteLots(liveLots);
+        if (liveFacilities && liveFacilities.length > 0) setFacilities(liveFacilities);
+      } catch (err) {
+        console.warn('Database synchronization error:', err);
+      }
+    }
+
+    loadLiveDatabase();
+  }, [isAuthenticated]);
 
   // Update initial tab when user logs in or out
   useEffect(() => {
@@ -65,38 +89,39 @@ function AppContent() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleResetDemo = () => {
-    const fresh = resetDemoData();
+  const handleResetDemo = async () => {
+    showToast('Resetting database demo dataset...');
+    const fresh = await resetDemoDataApi();
     setWasteLots(fresh.lots);
     setFacilities(fresh.facilities);
-    setSelectedLotId(fresh.lots[0].id);
-    showToast('Demo scenario reset to initial seeded dataset');
+    if (fresh.lots.length > 0) {
+      setSelectedLotId(fresh.lots[0].id);
+    }
+    showToast('Database reset to initial seeded dataset');
   };
 
-  const handleCreatedLot = (lotId: string) => {
-    const updated = getStoredWasteLots();
+  const handleCreatedLot = async (lotId: string) => {
+    const updated = await fetchWasteLotsApi();
     setWasteLots(updated);
     setSelectedLotId(lotId);
     setCurrentTab('RECOMMENDATION');
-    showToast(`Waste Fingerprint created for batch ${lotId}`);
+    showToast(`Waste batch ${lotId} saved to database`);
   };
 
-  const handleConfirmMatch = (lotId: string, facilityId: string) => {
-    const updatedLot = matchAndSelectFacilityForLot(lotId, facilityId);
+  const handleConfirmMatch = async (lotId: string, facilityId: string) => {
+    const updatedLot = await matchAndSelectFacilityApi(lotId, facilityId);
     if (updatedLot) {
-      const updatedList = getStoredWasteLots();
-      setWasteLots(updatedList);
+      setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
       setSelectedLotId(lotId);
       setCurrentTab('LOGISTICS');
       showToast(`Batch ${lotId} matched with ${updatedLot.matchedFacilityName}`);
     }
   };
 
-  const handleUpdateLotStatus = (lotId: string, newStatus: WasteStatus) => {
-    const updatedLot = updateLotLifecycleStatus(lotId, newStatus);
+  const handleUpdateLotStatus = async (lotId: string, newStatus: WasteStatus) => {
+    const updatedLot = await updateLotLifecycleStatusApi(lotId, newStatus);
     if (updatedLot) {
-      const updatedList = getStoredWasteLots();
-      setWasteLots(updatedList);
+      setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
       showToast(`Batch ${lotId} status updated to ${newStatus}`);
     }
   };

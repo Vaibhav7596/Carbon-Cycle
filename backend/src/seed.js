@@ -9,6 +9,9 @@ try {
   dns.setServers(['8.8.8.8', '1.1.1.1']);
 } catch (e) {}
 const User = require('./models/User');
+const Facility = require('./models/Facility');
+const WasteLot = require('./models/WasteLot');
+const { SEEDED_FACILITIES, SEEDED_WASTE_LOTS } = require('./data/seedData');
 
 const seedUsers = [
   {
@@ -46,14 +49,24 @@ const seedDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/carboncycle');
     console.log('[Seeder]: Connected.');
 
-    console.log('[Seeder]: Clearing existing user collection...');
+    console.log('[Seeder]: Clearing existing collections...');
     await User.deleteMany({});
+    await Facility.deleteMany({});
+    await WasteLot.deleteMany({});
 
     console.log('[Seeder]: Creating demo accounts...');
     for (const userData of seedUsers) {
       await User.create(userData);
       console.log(`  ✓ Created [${userData.role.toUpperCase()}]: ${userData.email}`);
     }
+
+    console.log('[Seeder]: Seeding Gujarat conversion facilities...');
+    await Facility.insertMany(SEEDED_FACILITIES);
+    console.log(`  ✓ Inserted ${SEEDED_FACILITIES.length} facilities`);
+
+    console.log('[Seeder]: Seeding active waste batches...');
+    await WasteLot.insertMany(SEEDED_WASTE_LOTS);
+    console.log(`  ✓ Inserted ${SEEDED_WASTE_LOTS.length} waste lots`);
 
     console.log('[Seeder]: Database successfully seeded!');
     process.exit(0);

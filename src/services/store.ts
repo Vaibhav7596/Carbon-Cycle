@@ -1,11 +1,13 @@
 import { SEEDED_FACILITIES, SEEDED_WASTE_LOTS } from '../data/constants';
 import { Facility, PathwayType, WasteFingerprint, WasteLot, WasteStatus } from '../types';
 import { calculateBatchImpact } from './carbonCalculator';
-import { calculateHaversineDistance, evaluatePathwaySuitability, matchFacilitiesForWaste } from './recommendationEngine';
+import { calculateHaversineDistance, evaluatePathwaySuitability } from './recommendationEngine';
+import { API_BASE_URL } from './authService';
 
 const STORAGE_KEY_LOTS = 'carboncycle_waste_lots_v1';
 const STORAGE_KEY_FACILITIES = 'carboncycle_facilities_v1';
 
+// Synchronous local cache helpers
 export function getStoredWasteLots(): WasteLot[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY_LOTS);
@@ -41,6 +43,145 @@ export function saveStoredFacilities(facilities: Facility[]): void {
     console.error('Failed to save facilities to local storage', e);
   }
 }
+
+// ---------------------------------------------------------------------------
+// ASYNC DATABASE API METHODS (PRIMARY)
+// ---------------------------------------------------------------------------
+
+export async function fetchWasteLotsApi(): Promise<WasteLot[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/waste-lots`);
+    const json = await res.json();
+    if (json.success && Array.isArray(json.lots)) {
+      saveStoredWasteLots(json.lots);
+      return json.lots;
+    }
+  } catch (error) {
+    console.warn('[Store API Warning]: Failed to fetch waste lots from server, using cached data.', error);
+  }
+  return getStoredWasteLots();
+}
+
+export async function fetchFacilitiesApi(): Promise<Facility[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/facilities`);
+    const json = await res.json();
+    if (json.success && Array.isArray(json.facilities)) {
+      saveStoredFacilities(json.facilities);
+      return json.facilities;
+    }
+  } catch (error) {
+    console.warn('[Store API Warning]: Failed to fetch facilities from server, using cached data.', error);
+  }
+  return getStoredFacilities();
+}
+
+export async function createWasteLotApi(
+  generatorName: string,
+  generatorType: string,
+  fingerprint: WasteFingerprint
+): Promise<WasteLot> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/waste-lots`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ generatorName, generatorType, fingerprint }),
+    });
+
+    const json = await res.json();
+    if (json.success && json.lot) {
+      const current = getStoredWasteLots();
+      saveStoredWasteLots([json.lot, ...current.filter((l) => l.id !== json.lot.id)]);
+      return json.lot;
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to create waste lot on server, falling back to local.', error);
+  }
+  // Fallback to local creation if network is down
+  return createNewWasteLot(generatorName, generatorType, fingerprint);
+}
+
+export async function matchAndSelectFacilityApi(
+  lotId: string,
+  facilityId: string
+): Promise<WasteLot | null> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/waste-lots/${lotId}/match`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ facilityId }),
+    });
+
+    const json = await res.json();
+    if (json.success && json.lot) {
+      const current = getStoredWasteLots();
+      const updated = current.map((l) => (l.id === lotId ? json.lot : l));
+      saveStoredWasteLots(updated);
+      return json.lot;
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to match facility on server, falling back to local.', error);
+  }
+  // Fallback to local matching
+  return matchAndSelectFacilityForLot(lotId, facilityId);
+}
+
+export async function updateLotLifecycleStatusApi(
+  lotId: string,
+  newStatus: WasteStatus,
+  customNote?: string
+): Promise<WasteLot | null> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/waste-lots/${lotId}/status`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: newStatus, note: customNote }),
+    });
+
+    const json = await res.json();
+    if (json.success && json.lot) {
+      const current = getStoredWasteLots();
+      const updated = current.map((l) => (l.id === lotId ? json.lot : l));
+      saveStoredWasteLots(updated);
+      return json.lot;
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to update lot status on server, falling back to local.', error);
+  }
+  // Fallback to local lifecycle update
+  return updateLotLifecycleStatus(lotId, newStatus, customNote);
+}
+
+export async function resetDemoDataApi(): Promise<{ lots: WasteLot[]; facilities: Facility[] }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/waste-lots/reset`, { method: 'POST' });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.lots) && Array.isArray(json.facilities)) {
+      saveStoredWasteLots(json.lots);
+      saveStoredFacilities(json.facilities);
+      return { lots: json.lots, facilities: json.facilities };
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to reset database on server, falling back to local.', error);
+  }
+  return resetDemoData();
+}
+
+// ---------------------------------------------------------------------------
+// SYNCHRONOUS FALLBACK / LOCAL CREATION METHODS
+// ---------------------------------------------------------------------------
 
 export function resetDemoData(): { lots: WasteLot[]; facilities: Facility[] } {
   localStorage.removeItem(STORAGE_KEY_LOTS);
@@ -84,7 +225,7 @@ export function createNewWasteLot(
         status: 'ANALYZED',
         timestamp: dateStr,
         note: `Fingerprint generated. Recommended pathway: ${recommendedPathway}`,
-      }
+      },
     ],
   };
 
@@ -138,8 +279,16 @@ export function matchAndSelectFacilityForLot(
   lot.impactMetrics = impact;
 
   lot.processingYield = {
-    outputType: pathway === 'BIOCHAR' ? 'Biochar & Process Heat' : pathway === 'BIOGAS' ? 'Biomethane (CBG) & Bio-slurry' : 'Organic Soil Amendment',
-    outputQuantity: pathway === 'BIOCHAR' ? `${(lot.fingerprint.quantityTonnes * 0.35).toFixed(1)} tonnes Biochar` : `${Math.round(lot.fingerprint.quantityTonnes * 80)} m³ Biogas`,
+    outputType:
+      pathway === 'BIOCHAR'
+        ? 'Biochar & Process Heat'
+        : pathway === 'BIOGAS'
+        ? 'Biomethane (CBG) & Bio-slurry'
+        : 'Organic Soil Amendment',
+    outputQuantity:
+      pathway === 'BIOCHAR'
+        ? `${(lot.fingerprint.quantityTonnes * 0.35).toFixed(1)} tonnes Biochar`
+        : `${Math.round(lot.fingerprint.quantityTonnes * 80)} m³ Biogas`,
     progressPercent: 0,
     startedAt: 'Pending Arrival',
     estimatedCompletionAt: '24h post-delivery',

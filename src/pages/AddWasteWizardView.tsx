@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 import { LocationPoint, WasteFingerprint, WasteType } from '../types';
-import { createNewWasteLot } from '../services/store';
+import { createWasteLotApi } from '../services/store';
+import { useAuth } from '../context/AuthContext';
 import { NavTab } from '../components/layout/Sidebar';
-import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 
 interface AddWasteWizardViewProps {
   onCreatedLot: (lotId: string) => void;
@@ -11,7 +12,9 @@ interface AddWasteWizardViewProps {
 }
 
 export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreatedLot, onCancel }) => {
+  const { user } = useAuth();
   const [step, setStep] = useState<number>(1);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Form State
   const [wasteType, setWasteType] = useState<WasteType>('AGRICULTURAL_RESIDUE');
@@ -20,8 +23,21 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
   const [organicFractionPercent, setOrganicFractionPercent] = useState<number>(92);
   const [contaminationPercent, setContaminationPercent] = useState<number>(2);
 
-  const [generatorName, setGeneratorName] = useState<string>('Gandhinagar Farmers Co-op');
-  const [generatorType, setGeneratorType] = useState<string>('Agricultural Enterprise');
+  const [generatorName, setGeneratorName] = useState<string>(
+    user?.organizationName || user?.name || 'Gandhinagar Farmers Co-op'
+  );
+  const [generatorType, setGeneratorType] = useState<string>(
+    user?.organizationType || 'Agricultural Enterprise'
+  );
+
+  useEffect(() => {
+    if (user?.organizationName) {
+      setGeneratorName(user.organizationName);
+    }
+    if (user?.organizationType) {
+      setGeneratorType(user.organizationType);
+    }
+  }, [user]);
 
   const [locationName, setLocationName] = useState<string>('Gandhinagar Agri Sector 30');
   const [address, setAddress] = useState<string>('Sector 30 Agriculture Belt, Gandhinagar, Gujarat');
@@ -56,27 +72,34 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
     setLng(preset.lng);
   };
 
-  const handleSubmit = () => {
-    const location: LocationPoint = {
-      name: locationName,
-      address,
-      lat,
-      lng,
-    };
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const location: LocationPoint = {
+        name: locationName,
+        address,
+        lat,
+        lng,
+      };
 
-    const fingerprint: WasteFingerprint = {
-      wasteType,
-      quantityTonnes: Number(quantityTonnes),
-      moisturePercent: Number(moisturePercent),
-      organicFractionPercent: Number(organicFractionPercent),
-      contaminationPercent: Number(contaminationPercent),
-      location,
-      availabilityWindow,
-      pricePerTon: Number(pricePerTon),
-    };
+      const fingerprint: WasteFingerprint = {
+        wasteType,
+        quantityTonnes: Number(quantityTonnes),
+        moisturePercent: Number(moisturePercent),
+        organicFractionPercent: Number(organicFractionPercent),
+        contaminationPercent: Number(contaminationPercent),
+        location,
+        availabilityWindow,
+        pricePerTon: Number(pricePerTon),
+      };
 
-    const newLot = createNewWasteLot(generatorName, generatorType, fingerprint);
-    onCreatedLot(newLot.id);
+      const newLot = await createWasteLotApi(generatorName, generatorType, fingerprint);
+      onCreatedLot(newLot.id);
+    } catch (err) {
+      console.error('Failed to create waste lot:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -432,10 +455,20 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
           ) : (
             <button
               onClick={handleSubmit}
-              className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-6 py-2.5 rounded-btn shadow-md transition"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark disabled:opacity-50 text-white text-xs font-bold px-6 py-2.5 rounded-btn shadow-md transition"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>Analyze & Find Matches</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving to Database...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Analyze & Find Matches</span>
+                </>
+              )}
             </button>
           )}
         </div>

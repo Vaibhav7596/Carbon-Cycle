@@ -8,6 +8,8 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+const facilityRoutes = require('./routes/facilityRoutes');
+const wasteLotRoutes = require('./routes/wasteLotRoutes');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -51,6 +53,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // API Routes
 app.use('/api', authRoutes);
+app.use('/api/facilities', facilityRoutes);
+app.use('/api/waste-lots', wasteLotRoutes);
 
 // Root Health Fallback
 app.get('/', (req, res) => {
