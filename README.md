@@ -3,6 +3,9 @@
 > **Hackathon Edition 2026**  
 > An end-to-end, rule-based decision and traceability platform connecting waste generators with conversion facilities, optimizing GIS route transport, and generating auditable net CO₂e climate impact reports.
 
+🚀 **Live Application**: [https://carbon-cycle-gev0.onrender.com/](https://carbon-cycle-gev0.onrender.com/)  
+🔗 **Live Backend API**: [https://carbon-cycle-api.onrender.com/api/health](https://carbon-cycle-api.onrender.com/api/health)
+
 ---
 
 ## 🌟 Key Features
