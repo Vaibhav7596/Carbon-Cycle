@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 import { LocationPoint, WasteFingerprint, WasteType } from '../types';
-import { createWasteLotApi } from '../services/store';
+import { createWasteLotApi, lookupPincodeApi } from '../services/store';
 import { useAuth } from '../context/AuthContext';
 import { NavTab } from '../components/layout/Sidebar';
-import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Loader2, Lock, Edit3, X } from 'lucide-react';
+import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Loader2, Lock, Edit3, X, Search, Check } from 'lucide-react';
 
 interface AddWasteWizardViewProps {
   onCreatedLot: (lotId: string) => void;
@@ -41,6 +41,12 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
   }, [user]);
 
   const [selectedPreset, setSelectedPreset] = useState<string>('Gandhinagar Farm Belt');
+  const [pincode, setPincode] = useState<string>('382030');
+  const [isLookingUpPincode, setIsLookingUpPincode] = useState<boolean>(false);
+  const [pincodeFeedback, setPincodeFeedback] = useState<{ status: 'idle' | 'success' | 'error'; message: string }>({
+    status: 'success',
+    message: 'Verified PIN 382030: Gandhinagar, Gujarat',
+  });
   const [locationName, setLocationName] = useState<string>('Gandhinagar Farm Belt');
   const [address, setAddress] = useState<string>('Sector 30 Agriculture Belt, Gandhinagar, Gujarat');
   const [lat, setLat] = useState<number>(23.2156);
@@ -49,13 +55,13 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
   const [availabilityWindow, setAvailabilityWindow] = useState<string>('Pickup Today (Immediate)');
   const [pricePerTon, setPricePerTon] = useState<number>(1200);
 
-  // Helper preset locations in Gujarat
+  // Helper preset locations in Gujarat with accurate 6-digit PIN codes
   const locationPresets = [
-    { name: 'Gandhinagar Farm Belt', address: 'Sector 30 Agriculture Belt, Gandhinagar, Gujarat', lat: 23.2156, lng: 72.6369 },
-    { name: 'Ahmedabad APMC Market', address: 'Vasna Market Road, Vasna, Ahmedabad, Gujarat', lat: 23.0225, lng: 72.5714 },
-    { name: 'Sanand Industrial Estate', address: 'GIDC Phase 2, Sanand, Gujarat', lat: 22.9897, lng: 72.3810 },
-    { name: 'Kheda Livestock Sector', address: 'Station Road, Kheda, Gujarat', lat: 22.7533, lng: 72.6868 },
-    { name: 'Kalol Agro Zone', address: 'Highway 41, Kalol, Gujarat', lat: 23.2323, lng: 72.4975 },
+    { name: 'Gandhinagar Farm Belt', pincode: '382030', address: 'Sector 30 Agriculture Belt, Gandhinagar, Gujarat', lat: 23.2156, lng: 72.6369 },
+    { name: 'Ahmedabad APMC Market', pincode: '380007', address: 'Vasna Market Road, Vasna, Ahmedabad, Gujarat', lat: 23.0225, lng: 72.5714 },
+    { name: 'Sanand Industrial Estate', pincode: '382110', address: 'GIDC Phase 2, Sanand, Gujarat', lat: 22.9897, lng: 72.3810 },
+    { name: 'Kheda Livestock Sector', pincode: '387411', address: 'Station Road, Kheda, Gujarat', lat: 22.7533, lng: 72.6868 },
+    { name: 'Kalol Agro Zone', pincode: '382721', address: 'Highway 41, Kalol, Gujarat', lat: 23.2323, lng: 72.4975 },
   ];
 
   const handleSelectType = (type: WasteType) => {
@@ -69,16 +75,83 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
 
   const handleSelectPreset = (preset: typeof locationPresets[0]) => {
     setSelectedPreset(preset.name);
+    setPincode(preset.pincode);
     setLocationName(preset.name);
     setAddress(preset.address);
     setLat(preset.lat);
     setLng(preset.lng);
+    setPincodeFeedback({
+      status: 'success',
+      message: `Verified PIN ${preset.pincode}: ${preset.name}`,
+    });
     setErrorMessage(null);
   };
 
   const handleSelectCustom = () => {
     setSelectedPreset('custom');
     setErrorMessage(null);
+  };
+
+  const triggerPincodeLookup = async (codeToLookup: string) => {
+    const cleaned = codeToLookup.trim().replace(/\D/g, '');
+    if (cleaned.length !== 6) {
+      setPincodeFeedback({
+        status: 'error',
+        message: 'Please enter a valid 6-digit numeric PIN code.',
+      });
+      return;
+    }
+
+    setIsLookingUpPincode(true);
+    setPincodeFeedback({ status: 'idle', message: 'Locating postal area & coordinates...' });
+
+    try {
+      const response = await lookupPincodeApi(cleaned);
+      if (response.success && response.data) {
+        const { lat, lng, areaName, district, state, formattedAddress } = response.data;
+        setLat(lat);
+        setLng(lng);
+        setLocationName(areaName || `${district} Regional Area`);
+        setAddress(formattedAddress || `${areaName}, ${district}, ${state}`);
+        setPincodeFeedback({
+          status: 'success',
+          message: `Detected: ${areaName}, ${district} (${state})`,
+        });
+        setErrorMessage(null);
+      } else {
+        setPincodeFeedback({
+          status: 'error',
+          message: response.message || 'Invalid or unrecognized 6-digit Indian PIN code. Please check.',
+        });
+      }
+    } catch (err: any) {
+      console.warn('Pincode lookup error:', err);
+      setPincodeFeedback({
+        status: 'error',
+        message: err.message || 'Error connecting to PIN location service.',
+      });
+    } finally {
+      setIsLookingUpPincode(false);
+    }
+  };
+
+  const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    const numericOnly = rawVal.replace(/\D/g, '').slice(0, 6);
+    setPincode(numericOnly);
+
+    if (selectedPreset !== 'custom') {
+      setSelectedPreset('custom');
+    }
+
+    if (numericOnly.length === 6) {
+      triggerPincodeLookup(numericOnly);
+    } else {
+      setPincodeFeedback({
+        status: 'idle',
+        message: numericOnly.length > 0 ? `Enter ${6 - numericOnly.length} more digits...` : '',
+      });
+    }
   };
 
   const handleContinue = () => {
@@ -110,14 +183,19 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
       }
     }
 
-    // Validation for Step 3
+    // Validation for Step 3 (PIN Code & Resolved Location)
     if (step === 3) {
-      if (!locationName.trim()) {
-        setErrorMessage('Please provide a pickup location name or select a preset.');
+      const cleanPin = pincode.trim().replace(/\D/g, '');
+      if (cleanPin.length !== 6) {
+        setErrorMessage('Please enter a valid 6-digit numeric PIN code (e.g. 382030).');
         return;
       }
-      if (isNaN(lat) || lat < -90 || lat > 90 || isNaN(lng) || lng < -180 || lng > 180) {
-        setErrorMessage('Please enter valid geographic coordinates.');
+      if (!locationName.trim()) {
+        setErrorMessage('Please provide a pickup location name or area.');
+        return;
+      }
+      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+        setErrorMessage('Coordinates could not be resolved from this PIN code. Please enter a valid PIN code.');
         return;
       }
     }
@@ -437,8 +515,8 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
         {/* STEP 3: Location & GIS */}
         {step === 3 && (
           <div className="space-y-4">
-            <h2 className="font-bold text-sm text-carbon-primary">Step 3: Waste Location & Pickup Coordinates</h2>
-            <p className="text-xs text-carbon-secondary">Select a regional Gujarat location preset or choose Custom Location to enter your own coordinates.</p>
+            <h2 className="font-bold text-sm text-carbon-primary">Step 3: Waste Location & Area PIN Code</h2>
+            <p className="text-xs text-carbon-secondary">Select a regional Gujarat location preset or enter a 6-digit Indian PIN code to automatically detect the area, district, and regional routing coordinates.</p>
 
             {/* Presets */}
             <div className="space-y-2 pt-2">
@@ -452,7 +530,7 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                    <Edit3 className="w-3 h-3 text-amber-600" /> Custom Editing Enabled
+                    <Edit3 className="w-3 h-3 text-amber-600" /> Custom PIN Mode
                   </span>
                 )}
               </div>
@@ -471,13 +549,15 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
                   >
                     <div className="font-bold flex items-center justify-between">
                       <span>{preset.name}</span>
-                      {selectedPreset === preset.name && <Lock className="w-3 h-3 text-brand-primary" />}
+                      <span className="text-[10px] font-mono bg-surface-muted px-1.5 py-0.5 rounded text-carbon-secondary border border-border">
+                        PIN {preset.pincode}
+                      </span>
                     </div>
                     <div className="text-[10px] opacity-80 truncate">{preset.address}</div>
                   </button>
                 ))}
 
-                {/* Custom / Manual Location Option */}
+                {/* Custom / Manual PIN Code Option */}
                 <button
                   type="button"
                   onClick={handleSelectCustom}
@@ -492,10 +572,10 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
                   </div>
                   <div>
                     <div className="font-bold flex items-center gap-1.5">
-                      <span>Custom / Manual Location</span>
-                      <span className="text-[9px] uppercase px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-extrabold">Editable</span>
+                      <span>Custom PIN Code</span>
+                      <span className="text-[9px] uppercase px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-extrabold">Auto-Detect</span>
                     </div>
-                    <div className="text-[10px] opacity-80">Click here to manually type custom address & GPS</div>
+                    <div className="text-[10px] opacity-80">Enter any 6-digit PIN to auto-fetch area location</div>
                   </div>
                 </button>
               </div>
@@ -506,96 +586,116 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
               <div className="flex items-center justify-between p-2.5 bg-surface-muted/70 border border-border rounded-btn text-xs text-carbon-secondary">
                 <div className="flex items-center gap-2">
                   <Lock className="w-3.5 h-3.5 text-carbon-muted flex-shrink-0" />
-                  <span>Preset selected: Details below are locked to ensure official regional coordinates.</span>
+                  <span>Preset selected: Details below are mapped to PIN <strong>{pincode}</strong> with verified regional coordinates.</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleSelectCustom}
                   className="text-[11px] font-bold text-brand-primary hover:text-brand-dark underline whitespace-nowrap ml-2"
                 >
-                  Edit Manually
+                  Enter Other PIN
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-between p-2.5 bg-brand-soft/40 border border-brand-primary/30 rounded-btn text-xs text-brand-dark">
                 <div className="flex items-center gap-2">
-                  <Edit3 className="w-3.5 h-3.5 text-brand-primary flex-shrink-0" />
-                  <span>Custom mode active: You can freely edit the location name, address, latitude, and longitude below.</span>
+                  <Sparkles className="w-3.5 h-3.5 text-brand-primary flex-shrink-0" />
+                  <span>Custom PIN Mode: Type any 6-digit Indian PIN code below. The system automatically queries the location API.</span>
                 </div>
               </div>
             )}
 
-            {/* Location Inputs */}
-            <div className="space-y-3 border-t border-border pt-3">
+            {/* Location & PIN Inputs (Latitude & Longitude completely removed) */}
+            <div className="space-y-3.5 border-t border-border pt-3">
+              {/* 6-Digit PIN Code Input with Live API Lookup */}
               <div>
                 <label className="block text-xs font-semibold text-carbon-primary mb-1">
-                  Location Name {selectedPreset !== 'custom' && <span className="text-[10px] font-normal text-carbon-muted">(Locked)</span>}
+                  Postal PIN Code (6-Digit Numeric Code) <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={pincode}
+                      onChange={handlePincodeChange}
+                      placeholder="e.g. 382030, 380007, 395001"
+                      className="w-full border border-border rounded-control px-3 py-2 text-xs font-mono font-bold tracking-widest text-carbon-primary focus:outline-none focus:border-brand-primary shadow-xs bg-surface"
+                    />
+                    {isLookingUpPincode && (
+                      <div className="absolute right-3 top-2.5 flex items-center gap-1.5 text-carbon-muted text-xs">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-primary" />
+                        <span className="text-[10px]">Querying API...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerPincodeLookup(pincode)}
+                    disabled={isLookingUpPincode || pincode.length !== 6}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-carbon-surface hover:bg-brand-primary hover:text-white border border-border rounded-control text-xs font-bold text-carbon-primary disabled:opacity-50 disabled:cursor-not-allowed transition shadow-xs"
+                  >
+                    {isLookingUpPincode ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5" />
+                    )}
+                    <span>Detect Area</span>
+                  </button>
+                </div>
+
+                {/* Status / Feedback Pill */}
+                {pincodeFeedback.message && (
+                  <div className={`mt-1.5 flex items-center gap-1.5 text-[11px] font-medium ${
+                    pincodeFeedback.status === 'success'
+                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded'
+                      : pincodeFeedback.status === 'error'
+                      ? 'text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded'
+                      : 'text-carbon-secondary px-1'
+                  }`}>
+                    {pincodeFeedback.status === 'success' && <Check className="w-3 h-3 text-emerald-600 flex-shrink-0" />}
+                    {pincodeFeedback.status === 'error' && <AlertCircle className="w-3 h-3 text-rose-600 flex-shrink-0" />}
+                    {pincodeFeedback.status === 'idle' && isLookingUpPincode && <Loader2 className="w-3 h-3 animate-spin text-brand-primary flex-shrink-0" />}
+                    <span>{pincodeFeedback.message}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Location Name (Auto-populated from PIN code API) */}
+              <div>
+                <label className="block text-xs font-semibold text-carbon-primary mb-1">
+                  Pickup Location / Area Name
                 </label>
                 <input
                   type="text"
-                  readOnly={selectedPreset !== 'custom'}
                   value={locationName}
                   onChange={(e) => setLocationName(e.target.value)}
-                  className={`w-full border rounded-control px-3 py-2 text-xs focus:outline-none transition ${
-                    selectedPreset !== 'custom'
-                      ? 'bg-surface-muted/80 text-carbon-secondary cursor-not-allowed border-border/80'
-                      : 'bg-surface border-border text-carbon-primary focus:border-brand-primary shadow-xs'
-                  }`}
+                  placeholder="e.g. Sector 30 Farming Hub or APMC Market Yard"
+                  className="w-full border border-border rounded-control px-3 py-2 text-xs bg-surface text-carbon-primary focus:outline-none focus:border-brand-primary shadow-xs"
                 />
+                <p className="text-[10px] text-carbon-muted mt-0.5">
+                  Automatically populated from PIN code postal database. You can customize the name if desired.
+                </p>
               </div>
 
+              {/* Detailed Street / Facility Address (Auto-populated from PIN code API) */}
               <div>
                 <label className="block text-xs font-semibold text-carbon-primary mb-1">
-                  Street Address {selectedPreset !== 'custom' && <span className="text-[10px] font-normal text-carbon-muted">(Locked)</span>}
+                  Full Street Address & Landmark
                 </label>
                 <textarea
                   rows={2}
-                  readOnly={selectedPreset !== 'custom'}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className={`w-full border rounded-control px-3 py-2 text-xs focus:outline-none resize-none transition ${
-                    selectedPreset !== 'custom'
-                      ? 'bg-surface-muted/80 text-carbon-secondary cursor-not-allowed border-border/80'
-                      : 'bg-surface border-border text-carbon-primary focus:border-brand-primary shadow-xs'
-                  }`}
+                  placeholder="e.g. Plot 14, GIDC Industrial Phase 2, Near APMC Gate"
+                  className="w-full border border-border rounded-control px-3 py-2 text-xs focus:outline-none resize-none bg-surface text-carbon-primary focus:border-brand-primary shadow-xs"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-carbon-secondary mb-1">
-                    Latitude {selectedPreset !== 'custom' && <span className="text-[10px] text-carbon-muted">(Locked)</span>}
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    readOnly={selectedPreset !== 'custom'}
-                    value={lat}
-                    onChange={(e) => setLat(parseFloat(e.target.value) || 0)}
-                    className={`w-full border rounded-control px-3 py-1.5 text-xs focus:outline-none transition ${
-                      selectedPreset !== 'custom'
-                        ? 'bg-surface-muted/80 text-carbon-secondary cursor-not-allowed border-border/80'
-                        : 'bg-surface border-border text-carbon-primary focus:border-brand-primary shadow-xs'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-carbon-secondary mb-1">
-                    Longitude {selectedPreset !== 'custom' && <span className="text-[10px] text-carbon-muted">(Locked)</span>}
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    readOnly={selectedPreset !== 'custom'}
-                    value={lng}
-                    onChange={(e) => setLng(parseFloat(e.target.value) || 0)}
-                    className={`w-full border rounded-control px-3 py-1.5 text-xs focus:outline-none transition ${
-                      selectedPreset !== 'custom'
-                        ? 'bg-surface-muted/80 text-carbon-secondary cursor-not-allowed border-border/80'
-                        : 'bg-surface border-border text-carbon-primary focus:border-brand-primary shadow-xs'
-                    }`}
-                  />
-                </div>
+                <p className="text-[10px] text-carbon-muted mt-0.5">
+                  Postal area automatically retrieved. Add specific farm gate, shed, or plot number for driver pickup.
+                </p>
               </div>
             </div>
           </div>
@@ -690,7 +790,7 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
               </div>
               <div className="flex justify-between border-b border-border pb-2">
                 <span className="text-carbon-muted">Origin Location:</span>
-                <span className="font-semibold text-carbon-primary">{locationName}</span>
+                <span className="font-semibold text-carbon-primary">{locationName} <span className="text-carbon-secondary font-mono text-[11px]">(PIN: {pincode})</span></span>
               </div>
               <div className="flex justify-between border-b border-border pb-2">
                 <span className="text-carbon-muted">Availability Window:</span>

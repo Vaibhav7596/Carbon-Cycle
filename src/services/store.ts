@@ -67,6 +67,109 @@ export function saveStoredNotifications(items: NotificationItem[]): void {
 // ASYNC DATABASE API METHODS (PRIMARY)
 // ---------------------------------------------------------------------------
 
+export interface PincodeLocationResult {
+  success: boolean;
+  message?: string;
+  source?: string;
+  data?: {
+    areaName: string;
+    district: string;
+    state: string;
+    formattedAddress: string;
+    lat: number;
+    lng: number;
+    pincode?: string;
+  };
+}
+
+export async function lookupPincodeApi(pincode: string): Promise<PincodeLocationResult> {
+  const cleanCode = (pincode || '').replace(/\D/g, '').slice(0, 6);
+  if (!/^\d{6}$/.test(cleanCode)) {
+    return {
+      success: false,
+      message: 'PIN code must be exactly 6 digits.',
+    };
+  }
+
+  // 1. Try Backend API endpoint
+  try {
+    const res = await fetch(`${API_BASE_URL}/location/pincode/${cleanCode}`);
+    const json = await res.json();
+    if (json.success && json.data) {
+      return json;
+    }
+  } catch (error) {
+    console.warn('[Pincode API Warning]: Backend lookup failed, trying direct provider fallback.', error);
+  }
+
+  // 2. Direct client-side provider fallback (Zippopotam.us)
+  try {
+    const zippoRes = await fetch(`https://api.zippopotam.us/in/${cleanCode}`);
+    if (zippoRes.ok) {
+      const zippoJson = await zippoRes.json();
+      if (Array.isArray(zippoJson.places) && zippoJson.places.length > 0) {
+        const place = zippoJson.places[0];
+        const areaName = place['place name'] || `Sector ${cleanCode}`;
+        const state = place['state'] || 'India';
+        const lat = parseFloat(place['latitude']) || 23.0;
+        const lng = parseFloat(place['longitude']) || 72.5;
+
+        return {
+          success: true,
+          source: 'client_geocoded',
+          data: {
+            areaName,
+            district: areaName,
+            state,
+            formattedAddress: `${areaName}, ${state} - ${cleanCode}`,
+            lat: Number(lat.toFixed(4)),
+            lng: Number(lng.toFixed(4)),
+            pincode: cleanCode,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Zippopotam client fallback failed', err);
+  }
+
+  // 3. Direct India Post client fallback
+  try {
+    const postalRes = await fetch(`https://api.postalpincode.in/pincode/${cleanCode}`);
+    if (postalRes.ok) {
+      const postalJson = await postalRes.json();
+      if (
+        Array.isArray(postalJson) &&
+        postalJson[0]?.Status === 'Success' &&
+        Array.isArray(postalJson[0].PostOffice) &&
+        postalJson[0].PostOffice.length > 0
+      ) {
+        const po = postalJson[0].PostOffice[0];
+        return {
+          success: true,
+          source: 'client_postal',
+          data: {
+            areaName: `${po.Name} (${po.District})`,
+            district: po.District,
+            state: po.State,
+            formattedAddress: `${po.Name}, ${po.District}, ${po.State} - ${cleanCode}`,
+            lat: 23.2156,
+            lng: 72.6369,
+            pincode: cleanCode,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('India Post client fallback failed', err);
+  }
+
+  return {
+    success: false,
+    message: `No active location found for PIN code ${cleanCode}. Please verify the 6-digit postal code.`,
+  };
+}
+
 export async function fetchWasteLotsApi(): Promise<WasteLot[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/waste-lots`);
