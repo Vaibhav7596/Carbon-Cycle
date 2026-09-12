@@ -38,10 +38,13 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
       ) || 18.4)
     : (logistics?.distanceKm || 18.4);
 
+  const [isUpdating, setIsUpdating] = React.useState(false);
+
   const travelTimeMins = calculateTravelTimeMinutes(distanceKm);
   const transportEmissions = calculateTransportEmissionsCO2e(distanceKm, fingerprint?.quantityTonnes || 10);
 
-  const handleNextStatus = () => {
+  const handleNextStatus = async () => {
+    if (isUpdating) return;
     let nextSt: WasteStatus = 'PICKUP';
     if (status === 'MATCHED') nextSt = 'PICKUP';
     else if (status === 'PICKUP') nextSt = 'IN_TRANSIT';
@@ -49,8 +52,14 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
     else if (status === 'AT_GATE') nextSt = 'DELIVERED';
     else if (status === 'DELIVERED') nextSt = 'PROCESSING';
     else if (status === 'PROCESSING') nextSt = 'COMPLETED';
+    else return;
 
-    onUpdateLotStatus(activeLot.id, nextSt);
+    setIsUpdating(true);
+    try {
+      await onUpdateLotStatus(activeLot.id, nextSt);
+    } finally {
+      setTimeout(() => setIsUpdating(false), 500);
+    }
   };
 
   return (
@@ -156,16 +165,23 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
             <div className="pt-2">
               {status !== 'COMPLETED' ? (
                 <button
+                  disabled={isUpdating}
                   onClick={handleNextStatus}
-                  className="w-full bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs py-2.5 px-4 rounded-btn shadow-sm flex items-center justify-center gap-2 transition"
+                  className={`w-full bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs py-2.5 px-4 rounded-btn shadow-sm flex items-center justify-center gap-2 transition ${
+                    isUpdating ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
                 >
                   <span>
-                    {status === 'MATCHED' && 'Start Pickup Dispatch →'}
-                    {status === 'PICKUP' && 'Mark Picked Up & In-Transit →'}
-                    {status === 'IN_TRANSIT' && 'Mark Truck Arrived at Facility Gate →'}
-                    {status === 'AT_GATE' && 'Complete Weighbridge Check-In & Intake →'}
-                    {status === 'DELIVERED' && 'Load Feedstock into Conversion Reactor →'}
-                    {status === 'PROCESSING' && 'Mark Conversion Completed & Issue Certificate →'}
+                    {isUpdating ? 'Updating Status...' : (
+                      <>
+                        {status === 'MATCHED' && 'Start Pickup Dispatch →'}
+                        {status === 'PICKUP' && 'Mark Picked Up & In-Transit →'}
+                        {status === 'IN_TRANSIT' && 'Mark Truck Arrived at Facility Gate →'}
+                        {status === 'AT_GATE' && 'Complete Weighbridge Check-In & Intake →'}
+                        {status === 'DELIVERED' && 'Load Feedstock into Conversion Reactor →'}
+                        {status === 'PROCESSING' && 'Mark Conversion Completed & Issue Certificate →'}
+                      </>
+                    )}
                   </span>
                 </button>
               ) : (
@@ -183,7 +199,9 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
               Lifecycle Event Audit Log
             </h3>
             <div className="space-y-2 text-xs">
-              {activeLot.timeline.map((entry, idx) => (
+              {activeLot.timeline
+                .filter((entry, idx, arr) => idx === 0 || entry.status !== arr[idx - 1].status)
+                .map((entry, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 border-b border-border/40 pb-2 last:border-0">
                   <div className="w-2 h-2 rounded-full bg-brand-primary mt-1.5 flex-shrink-0"></div>
                   <div>
@@ -204,9 +222,6 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
         <div className="lg:col-span-7 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-carbon-primary uppercase tracking-wider">
             <span>Source to Facility GIS Transit Line</span>
-            <span className="text-brand-primary font-mono font-semibold">
-              Live Polyline Simulation
-            </span>
           </div>
 
           <NetworkMap

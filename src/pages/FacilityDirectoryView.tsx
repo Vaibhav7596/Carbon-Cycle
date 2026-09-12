@@ -132,9 +132,6 @@ export const FacilityDirectoryView: React.FC<FacilityDirectoryViewProps> = ({
                   <span className="text-carbon-muted text-[10px] block">Processing Fee</span>
                   <span className="font-bold text-carbon-primary">₹{fac.processingCostPerTon} / ton</span>
                 </div>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                  Active Intake Hub
-                </span>
               </div>
 
             </div>

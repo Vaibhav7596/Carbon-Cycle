@@ -51,8 +51,6 @@ function AppContent() {
   useEffect(() => {
     if (currentTab === 'RECOMMENDATION') {
       setIsSidebarCollapsed(true);
-    } else {
-      setIsSidebarCollapsed(false);
     }
   }, [currentTab]);
 
@@ -94,10 +92,10 @@ function AppContent() {
     }
   }, [isAuthenticated, user?.role]);
 
-  const handleNavigate = (tab: NavTab) => {
+  const handleNavigate = (tab: NavTab, authMode?: 'LOGIN' | 'REGISTER') => {
     if (tab !== 'LANDING' && !isAuthenticated) {
       setPendingTab(tab);
-      setAuthModalOpen(true);
+      setAuthModalOpen(true, authMode || 'LOGIN');
       return;
     }
     if (currentTab !== 'ADD_WASTE') {
@@ -178,7 +176,7 @@ function AppContent() {
   if (currentTab === 'LANDING' || !isAuthenticated) {
     return (
       <>
-        <LandingPage onEnterPlatform={(tab) => handleNavigate(tab)} />
+        <LandingPage onEnterPlatform={(tab, authMode) => handleNavigate(tab, authMode)} />
         <AuthModal />
       </>
     );
@@ -209,15 +207,17 @@ function AppContent() {
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         
-        {/* Topbar Header with Live MongoDB Notifications */}
-        <Topbar
-          currentTab={currentTab}
-          onSelectTab={handleNavigate}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        />
+        {/* Topbar Header with Live MongoDB Notifications (rendered only where search and global alerts are relevant) */}
+        {showTopbar && (
+          <Topbar
+            currentTab={currentTab}
+            onSelectTab={handleNavigate}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+        )}
 
         {/* View Router Body */}
         <main className="flex-1 overflow-y-auto pb-12">

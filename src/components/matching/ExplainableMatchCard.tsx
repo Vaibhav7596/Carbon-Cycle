@@ -177,18 +177,32 @@ export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
         <div className="pt-2">
           {isMatched ? (
             <div className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm">
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 min-w-[16px] shrink-0 overflow-visible text-white" />
               <span>Intake Accepted & Scheduled</span>
             </div>
           ) : isRequested ? (
             <div className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-amber-500 text-white shadow-sm animate-pulse">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-4 h-4 min-w-[16px] shrink-0 text-white" />
               <span>Intake Request Pending Facility Operator Review</span>
+            </div>
+          ) : isRejected ? (
+            <div className="space-y-2">
+              <div className="w-full py-2 px-3 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-rose-50 text-rose-800 border border-rose-200 shadow-xs">
+                <span>Intake Request Declined by Operator</span>
+              </div>
+              <button
+                onClick={() => onSelectFacility(facility.id)}
+                className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer bg-carbon-primary text-white hover:bg-black"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Re-submit Intake Request</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           ) : (
             <button
               onClick={() => onSelectFacility(facility.id)}
-              className={`w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 transition ${
+              className={`w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                 isTopMatch
                   ? 'bg-brand-primary text-white hover:bg-brand-dark shadow-sm'
                   : 'bg-carbon-primary text-white hover:bg-black'

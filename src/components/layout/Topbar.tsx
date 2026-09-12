@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bell } from 'lucide-react';
+import { Search, Bell, CheckCircle2, XCircle, Truck, Package, ArrowUpRight } from 'lucide-react';
 import { NavTab } from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 
@@ -86,156 +86,183 @@ export const Topbar: React.FC<TopbarProps> = ({
     }
   };
 
-  // Close notifications dropdown when clicking outside
-  React.useEffect(() => {
-    if (!showNotifications) return;
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('#notifications-dropdown-container')) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener('mousedown', handleDocumentClick);
-    return () => document.removeEventListener('mousedown', handleDocumentClick);
-  }, [showNotifications]);
 
   return (
-    <header className="h-16 bg-surface border-b border-border px-6 flex items-center justify-between sticky top-0 z-40 gap-4">
-      {/* Search bar takes prime spot on the left / center */}
-      <div className="flex-1 max-w-lg">
-        <div className="relative w-full">
-          <Search className="w-4 h-4 text-carbon-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search waste, facility, batch ID, or location..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-surface-muted/60 text-sm text-carbon-primary pl-10 pr-4 py-2 rounded-xl border border-border/80 focus:outline-none focus:border-brand-primary focus:bg-surface shadow-xs transition"
-          />
-        </div>
-      </div>
-
-      {/* Right Controls */}
-      <div className="flex items-center gap-3">
-        {/* Search Input (Shifted to right beside notification) */}
-        {currentTab !== 'LANDING' && (
-          <div className="hidden sm:flex items-center relative w-56 md:w-72">
-            <Search className="w-3.5 h-3.5 text-carbon-muted absolute left-3 pointer-events-none" />
+    <header className="h-16 bg-surface border-b border-border sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between gap-4">
+        {/* Search bar takes prime spot on the left / center */}
+        <div className="flex-1 max-w-lg">
+          <div className="relative w-full">
+            <Search className="w-4 h-4 text-carbon-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search waste, facility, or batch ID..."
+              placeholder="Search waste, facility, batch ID, or location..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-surface-muted/60 text-xs text-carbon-primary pl-8 pr-3 py-1.5 rounded-control border border-border/80 focus:outline-none focus:border-brand-primary focus:bg-surface transition"
+              className="w-full bg-surface-muted/60 text-sm text-carbon-primary pl-10 pr-4 py-2 rounded-xl border border-border/80 focus:outline-none focus:border-brand-primary focus:bg-surface shadow-xs transition"
             />
           </div>
-        )}
+        </div>
 
-        {/* Notifications Icon Toggle */}
-        <div className="relative" ref={notifRef}>
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="p-1.5 text-carbon-secondary hover:text-carbon-primary rounded-btn border border-border hover:bg-surface-muted transition relative"
-            title="Real-time Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-brand-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-surface shadow-sm">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
+        {/* Right Controls */}
+        <div className="flex items-center gap-3 ml-auto">
+          {/* Notifications Icon Toggle */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="w-10 h-10 flex items-center justify-center text-carbon-secondary hover:text-carbon-primary rounded-xl border border-border hover:bg-surface-muted transition relative cursor-pointer shadow-xs"
+              title="Real-time Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-brand-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-surface shadow-sm">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
 
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-88 max-w-[90vw] bg-surface border border-border rounded-card shadow-modal p-3 z-50 text-xs space-y-2.5">
-              <div className="flex items-center justify-between font-semibold border-b border-border pb-2">
-                <div className="flex items-center gap-1.5">
-                  <span>Intake & Gate Alerts</span>
-                  {unreadCount > 0 && (
-                    <span className="text-[10px] bg-brand-soft text-brand-primary font-bold px-1.5 py-0.2 rounded-full">
-                      {unreadCount} new
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="text-[10px] text-brand-primary hover:underline"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium">
-                    MongoDB Live
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
-                {notifications.length === 0 ? (
-                  <div className="py-6 text-center text-carbon-muted">
-                    <Bell className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
-                    <p className="text-[11px]">No alerts right now</p>
+            {showNotifications && (
+              <div 
+                className="absolute right-0 mt-2 w-[350px] sm:w-[380px] max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-modal p-3.5 z-50 text-xs space-y-2.5 animate-in fade-in-50 zoom-in-95 duration-150 ring-1 ring-black/5"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-brand-soft flex items-center justify-center text-brand-primary">
+                      <Bell className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-xs text-carbon-primary leading-none">Notifications & Alerts</h3>
+                      <p className="text-[10px] text-carbon-secondary mt-0.5">Live platform and facility updates</p>
+                    </div>
                   </div>
-                ) : (
-                  notifications.map((notif) => {
-                    const isIntake = notif.type === 'INTAKE_REQUEST';
-                    const isAccepted = notif.type === 'REQUEST_ACCEPTED';
-                    const isRejected = notif.type === 'REQUEST_REJECTED';
-                    const isGate = notif.type === 'GATE_ARRIVAL';
+                  <div className="flex items-center gap-1.5">
+                    {unreadCount > 0 ? (
+                      <>
+                        <span className="text-[9px] bg-brand-soft text-brand-dark font-bold px-2 py-0.5 rounded-full border border-brand-primary/20">
+                          {unreadCount} new
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          className="text-[10px] font-semibold text-brand-primary hover:text-brand-dark hover:underline cursor-pointer transition ml-0.5"
+                        >
+                          Mark all read
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[9px] text-carbon-muted font-medium bg-surface-muted px-1.5 py-0.5 rounded-full">
+                        Up to date
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-                    const borderClass = isIntake
-                      ? 'border-l-amber-500 bg-amber-500/5'
-                      : isAccepted
-                      ? 'border-l-emerald-500 bg-emerald-500/5'
-                      : isRejected
-                      ? 'border-l-rose-500 bg-rose-500/5'
-                      : isGate
-                      ? 'border-l-blue-600 bg-blue-600/5'
-                      : 'border-l-brand-primary bg-surface-muted/50';
-
-                    return (
-                      <div
-                        key={notif.id}
-                        onClick={() => handleNotificationClick(notif)}
-                        className={`p-2.5 rounded-control border border-border/70 border-l-4 ${borderClass} cursor-pointer hover:bg-surface-muted/70 transition ${
-                          !notif.read ? 'ring-1 ring-brand-primary/20 font-medium' : 'opacity-85'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <p className="font-semibold text-carbon-primary text-xs flex items-center gap-1.5">
-                            {!notif.read && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-brand-primary inline-block"></span>
-                            )}
-                            {notif.title}
-                          </p>
-                          <span className="text-[9px] text-carbon-muted whitespace-nowrap">
-                            {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-carbon-secondary leading-snug">
-                          {notif.message}
-                        </p>
-                        {notif.lotDisplayId && (
-                          <div className="mt-1 flex items-center justify-between text-[10px]">
-                            <span className="font-mono text-carbon-muted">{notif.lotDisplayId}</span>
-                            {notif.actionTab && (
-                              <span className="text-brand-primary font-medium hover:underline flex items-center gap-0.5">
-                                View details &rarr;
-                              </span>
-                            )}
-                          </div>
-                        )}
+                {/* Notifications List */}
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-0.5">
+                  {notifications.length === 0 ? (
+                    <div className="py-7 text-center space-y-1.5">
+                      <div className="w-9 h-9 rounded-full bg-surface-muted flex items-center justify-center mx-auto text-carbon-muted/60">
+                        <Bell className="w-4 h-4" />
                       </div>
-                    );
-                  })
+                      <p className="font-bold text-xs text-carbon-primary">All caught up!</p>
+                      <p className="text-[10px] text-carbon-muted max-w-[200px] mx-auto">
+                        There are no new intake requests or shipment alerts right now.
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.map((notif) => {
+                      const isIntake = notif.type === 'INTAKE_REQUEST';
+                      const isAccepted = notif.type === 'REQUEST_ACCEPTED';
+                      const isRejected = notif.type === 'REQUEST_REJECTED';
+                      const isGate = notif.type === 'GATE_ARRIVAL';
+
+                      const borderClass = isIntake
+                        ? 'border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10'
+                        : isAccepted
+                        ? 'border-l-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10'
+                        : isRejected
+                        ? 'border-l-rose-500 bg-rose-500/5 hover:bg-rose-500/10'
+                        : isGate
+                        ? 'border-l-blue-600 bg-blue-600/5 hover:bg-blue-600/10'
+                        : 'border-l-brand-primary bg-surface-muted/50 hover:bg-surface-muted/80';
+
+                      const iconBgClass = isIntake
+                        ? 'bg-amber-100 text-amber-700'
+                        : isAccepted
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : isRejected
+                        ? 'bg-rose-100 text-rose-700'
+                        : isGate
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-brand-soft text-brand-primary';
+
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`p-2.5 rounded-lg border border-border/70 border-l-[4px] ${borderClass} cursor-pointer transition shadow-xs ${
+                            !notif.read ? 'ring-1 ring-brand-primary/20 bg-surface' : 'opacity-85'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${iconBgClass}`}>
+                              {isIntake && <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />}
+                              {isAccepted && <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />}
+                              {isRejected && <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
+                              {isGate && <Truck className="w-3.5 h-3.5 stroke-[2.5]" />}
+                              {!isIntake && !isAccepted && !isRejected && !isGate && <Package className="w-3.5 h-3.5 stroke-[2.5]" />}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                                <p className="font-bold text-xs text-carbon-primary flex items-center gap-1 truncate">
+                                  {!notif.read && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-brand-primary inline-block flex-shrink-0"></span>
+                                  )}
+                                  <span className="truncate">{notif.title}</span>
+                                </p>
+                                <span className="text-[9px] font-medium text-carbon-muted whitespace-nowrap">
+                                  {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-carbon-secondary leading-snug">
+                                {notif.message}
+                              </p>
+
+                              {notif.lotDisplayId && (
+                                <div className="mt-1.5 pt-1.5 border-t border-border/50 flex items-center justify-between text-[10px]">
+                                  <span className="font-mono text-[9px] text-carbon-secondary bg-surface-muted px-1.5 py-0.2 rounded border border-border">
+                                    {notif.lotDisplayId}
+                                  </span>
+                                  {notif.actionTab && (
+                                    <span className="text-brand-primary font-bold hover:underline flex items-center gap-0.5 text-[11px]">
+                                      View details &rarr;
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer */}
+                {notifications.length > 0 && (
+                  <div className="pt-1.5 border-t border-border flex items-center justify-between text-[10px] text-carbon-muted font-medium">
+                    <span>{notifications.length} alert{notifications.length === 1 ? '' : 's'}</span>
+                    <span>Synced live</span>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
         </div>
       </div>
-    </header>
+    </div>
+  </header>
   );
 };

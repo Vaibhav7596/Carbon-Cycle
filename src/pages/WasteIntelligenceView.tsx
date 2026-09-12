@@ -3,7 +3,7 @@ import { Facility, WasteLot } from '../types';
 import { evaluatePathwaySuitability, matchFacilitiesForWaste } from '../services/recommendationEngine';
 import { ExplainableMatchCard } from '../components/matching/ExplainableMatchCard';
 import { WASTE_TYPE_LABELS } from '../data/constants';
-import { Sparkles, MapPin, Scale, Leaf, ArrowLeft, CheckCircle2, Factory, ChevronRight, Award, ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, AlertCircle, Clock } from 'lucide-react';
 
 interface WasteIntelligenceViewProps {
   lot: WasteLot;
@@ -72,26 +72,6 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
           </div>
         </div>
 
-        {/* Sidebar Expansion / Widescreen Mode Toggle */}
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-btn border border-border bg-surface hover:bg-surface-muted text-carbon-primary shadow-xs transition"
-            title={isSidebarCollapsed ? "Expand navigation sidebar" : "Hide sidebar to widen view"}
-          >
-            {isSidebarCollapsed ? (
-              <>
-                <PanelLeftOpen className="w-4 h-4 text-brand-primary" />
-                <span>Show Sidebar</span>
-              </>
-            ) : (
-              <>
-                <PanelLeftClose className="w-4 h-4 text-carbon-muted" />
-                <span>Widescreen (Hide Sidebar)</span>
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Rejection Notification Banner */}

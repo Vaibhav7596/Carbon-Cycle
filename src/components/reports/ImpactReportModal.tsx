@@ -30,6 +30,8 @@ export const ImpactReportModal: React.FC<ImpactReportModalProps> = ({ isOpen, on
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const mouseDownTargetRef = React.useRef<EventTarget | null>(null);
+
   if (!isOpen || !lot) return null;
 
   const { fingerprint, impactMetrics, logistics } = lot;
@@ -53,7 +55,14 @@ export const ImpactReportModal: React.FC<ImpactReportModalProps> = ({ isOpen, on
 
   return (
     <div 
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => {
+        mouseDownTargetRef.current = e.target;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) {
+          onClose();
+        }
+      }}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 print:static print:p-0 print:m-0 print:bg-transparent print:backdrop-blur-none print:w-full print:h-auto print:block"
     >
       <div 
