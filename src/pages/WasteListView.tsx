@@ -4,7 +4,6 @@ import { WASTE_TYPE_LABELS } from '../data/constants';
 import { NavTab } from '../components/layout/Sidebar';
 import { Plus, Search, Filter, Trash2, ArrowRight, Eye, FileText, CheckCircle2, Calculator } from 'lucide-react';
 import { CalculationDrawer } from '../components/carbon/CalculationDrawer';
-import { Plus, Search, Filter, Trash2, ArrowRight, Eye, FileText, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface WasteListViewProps {

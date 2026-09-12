@@ -183,14 +183,6 @@ function AppContent() {
           <Topbar
             currentTab={currentTab}
             onSelectTab={handleNavigate}
-            onResetDemo={handleResetDemo}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-        {/* Topbar Header (hidden specifically on Overview) */}
-        {currentTab !== 'DASHBOARD' && (
-          <Topbar
-            currentTab={currentTab}
-            onSelectTab={handleNavigate}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             isSidebarCollapsed={isSidebarCollapsed}
