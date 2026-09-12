@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-canvas text-carbon-primary font-sans antialiased;
+  }
+}
+
+/* Custom Leaflet Map styling tweaks */
+.leaflet-container {
+  font-family: 'Inter', sans-serif !important;
+  z-index: 10;
+}
+
+.custom-map-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #E3E7E3 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px !important;
+}
+
+/* Printable Certificate Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-certificate, #printable-certificate * {
+    visibility: visible;
+  }
+  #printable-certificate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
