@@ -3,6 +3,7 @@ import { WasteLot } from '../types';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 import { NavTab } from '../components/layout/Sidebar';
 import { Plus, Search, Filter, Trash2, ArrowRight, Eye, FileText, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface WasteListViewProps {
   wasteLots: WasteLot[];
@@ -19,8 +20,11 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
   onOpenReport,
   searchQuery,
 }) => {
+  const { user } = useAuth();
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
+  const isFacilityOperator = user?.role === 'facility_operator';
 
   const filteredLots = wasteLots.filter((lot) => {
     const matchesSearch = 
@@ -54,17 +58,26 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold text-carbon-primary tracking-tight">Waste Lots Registry</h1>
-          <p className="text-xs text-carbon-secondary">Track all registered waste batches entering the CarbonCycle decision network.</p>
+          <h1 className="text-xl font-extrabold text-carbon-primary tracking-tight">
+            {isFacilityOperator ? 'Inbound Feedstock Registry' : 'Waste Lots Registry'}
+          </h1>
+          <p className="text-xs text-carbon-secondary">
+            {isFacilityOperator
+              ? 'Track incoming feedstock batches routed for facility intake and reactor loading.'
+              : 'Track all registered waste batches entering the CarbonCycle decision network.'}
+          </p>
         </div>
 
-        <button
-          onClick={() => onSelectTab('ADD_WASTE')}
-          className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition"
-        >
-          <Plus className="w-4 h-4" />
-          <span>List Waste Batch</span>
-        </button>
+        {/* Hide + List Waste Batch button for facility operators */}
+        {!isFacilityOperator && (
+          <button
+            onClick={() => onSelectTab('ADD_WASTE')}
+            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>List Waste Batch</span>
+          </button>
+        )}
       </div>
 
       {/* Filter Row */}
