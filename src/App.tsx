@@ -138,6 +138,9 @@ function AppContent() {
     );
   }
 
+  const hideNavbarTabs: NavTab[] = ['DASHBOARD', 'RECOMMENDATION', 'ADD_WASTE', 'CARBON', 'ANALYTICS'];
+  const showTopbar = !hideNavbarTabs.includes(currentTab);
+
   return (
     <div className="flex min-h-screen bg-canvas text-carbon-primary font-sans">
       
@@ -158,14 +161,16 @@ function AppContent() {
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Topbar Header */}
-        <Topbar
-          currentTab={currentTab}
-          onSelectTab={handleNavigate}
-          onResetDemo={handleResetDemo}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
+        {/* Topbar Header (rendered only where search and global alerts are relevant) */}
+        {showTopbar && (
+          <Topbar
+            currentTab={currentTab}
+            onSelectTab={handleNavigate}
+            onResetDemo={handleResetDemo}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        )}
 
         {/* View Router Body */}
         <main className="flex-1 overflow-y-auto pb-12">
@@ -240,6 +245,7 @@ function AppContent() {
               wasteLots={wasteLots}
               onUpdateLotStatus={handleUpdateLotStatus}
               onOpenReport={(lot) => setOpenReportLot(lot)}
+              searchQuery={searchQuery}
             />
           )}
 
@@ -261,6 +267,7 @@ function AppContent() {
             <ReportsView
               wasteLots={wasteLots}
               onOpenReport={(lot) => setOpenReportLot(lot)}
+              searchQuery={searchQuery}
             />
           )}
         </main>

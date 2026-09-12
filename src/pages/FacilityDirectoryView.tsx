@@ -17,10 +17,18 @@ export const FacilityDirectoryView: React.FC<FacilityDirectoryViewProps> = ({
   const [filterType, setFilterType] = useState<string>('ALL');
 
   const filtered = facilities.filter((fac) => {
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      fac.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fac.location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fac.location.address.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      fac.name.toLowerCase().includes(q) ||
+      fac.location.name.toLowerCase().includes(q) ||
+      fac.location.address.toLowerCase().includes(q) ||
+      fac.type.toLowerCase().includes(q) ||
+      fac.acceptedWasteTypes.some(
+        (wType) =>
+          wType.toLowerCase().includes(q) ||
+          (WASTE_TYPE_LABELS[wType]?.label && WASTE_TYPE_LABELS[wType].label.toLowerCase().includes(q))
+      );
 
     const matchesType = filterType === 'ALL' || fac.type === filterType;
     return matchesSearch && matchesType;
@@ -49,7 +57,7 @@ export const FacilityDirectoryView: React.FC<FacilityDirectoryViewProps> = ({
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`px-3 py-1 rounded-full font-semibold transition ${
+              className={`px-3 py-1 rounded-full font-semibold transition cursor-pointer ${
                 filterType === type
                   ? 'bg-brand-primary text-white'
                   : 'bg-surface-muted text-carbon-secondary hover:text-carbon-primary'
@@ -60,7 +68,7 @@ export const FacilityDirectoryView: React.FC<FacilityDirectoryViewProps> = ({
           ))}
         </div>
 
-        <span className="text-carbon-muted text-xs">
+        <span className="text-carbon-muted text-xs font-medium">
           {filtered.length} Active Processing Facilities
         </span>
       </div>
@@ -124,14 +132,9 @@ export const FacilityDirectoryView: React.FC<FacilityDirectoryViewProps> = ({
                   <span className="text-carbon-muted text-[10px] block">Processing Fee</span>
                   <span className="font-bold text-carbon-primary">₹{fac.processingCostPerTon} / ton</span>
                 </div>
-
-                <button
-                  onClick={() => onSelectFacility && onSelectFacility(fac.id)}
-                  className="flex items-center gap-1 text-brand-primary hover:text-brand-dark font-semibold text-xs"
-                >
-                  <span>Facility Profile</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                  Active Intake Hub
+                </span>
               </div>
 
             </div>
