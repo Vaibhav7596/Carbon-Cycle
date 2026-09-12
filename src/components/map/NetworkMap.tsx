@@ -1,9 +1,10 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, ZoomControl } from 'react-leaflet';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, ZoomControl, useMap } from 'react-leaflet';
 import { Facility, WasteLot } from '../../types';
 import { createFacilityIcon, createSourceIcon } from '../../utils/mapIcons';
 import { calculateHaversineDistanceKm, calculateTravelTimeMinutes, calculateTransportEmissionsCO2e } from '../../utils/haversine';
-import { MapPin, Factory, ArrowRight, Truck, Leaf, ChevronRight, Navigation, Clock, ShieldCheck } from 'lucide-react';
+import { fetchRoadRouteApi, RoadRouteResult } from '../../services/store';
+import { MapPin, Factory, ArrowRight, Truck, Leaf, ChevronRight, Navigation, Clock, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 
 interface NetworkMapProps {
   wasteLots: WasteLot[];
@@ -12,7 +13,47 @@ interface NetworkMapProps {
   onSelectLot?: (lotId: string) => void;
   onSelectFacility?: (facilityId: string) => void;
   height?: string;
+  onRouteCalculated?: (route: RoadRouteResult) => void;
 }
+
+/**
+ * Sub-component to fit map viewport bounds to the active route geometry
+ */
+const MapRouteFitter: React.FC<{ positions: [number, number][] }> = ({ positions }) => {
+  const map = useMap();
+  const lastKey = useRef<string>('');
+
+  useEffect(() => {
+    if (!positions || positions.length < 2) return;
+    const start = positions[0];
+    const end = positions[positions.length - 1];
+    const key = `${start[0]},${start[1]}->${end[0]},${end[1]}:${positions.length}`;
+    if (lastKey.current === key) return;
+    lastKey.current = key;
+
+    try {
+      let minLat = positions[0][0], maxLat = positions[0][0];
+      let minLng = positions[0][1], maxLng = positions[0][1];
+      for (const [lat, lng] of positions) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+      map.fitBounds(
+        [
+          [minLat, minLng],
+          [maxLat, maxLng],
+        ],
+        { padding: [50, 50], maxZoom: 14 }
+      );
+    } catch (err) {
+      console.warn('Map fitBounds error:', err);
+    }
+  }, [positions, map]);
+
+  return null;
+};
 
 export const NetworkMap: React.FC<NetworkMapProps> = ({
   wasteLots,
@@ -21,17 +62,70 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   onSelectLot,
   onSelectFacility,
   height = '440px',
+  onRouteCalculated,
 }) => {
   // Center map on Gujarat region (Gandhinagar / Ahmedabad)
   const centerLat = 23.1000;
   const centerLng = 72.5800;
 
-  // Selected or first matched lot for prototype route visualization
+  // Selected or first matched lot for route visualization
   const activeLot = (selectedLotId && wasteLots.find((l) => l.id === selectedLotId)) ||
     wasteLots.find((l) => l.matchedFacilityLocation && l.fingerprint?.location) ||
     wasteLots[0];
 
-  // Active route calculation using Haversine formula
+  const sourceLoc = activeLot?.fingerprint?.location;
+  const facilityLoc = activeLot?.matchedFacilityLocation;
+
+  // OSRM Road Route state
+  const [roadRoute, setRoadRoute] = useState<RoadRouteResult | null>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  const onRouteCalculatedRef = useRef(onRouteCalculated);
+  useEffect(() => {
+    onRouteCalculatedRef.current = onRouteCalculated;
+  });
+
+  // Fetch road route whenever source or destination coordinates change
+  useEffect(() => {
+    if (!sourceLoc?.lat || !sourceLoc?.lng || !facilityLoc?.lat || !facilityLoc?.lng) {
+      setRoadRoute(null);
+      setRouteError(null);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingRoute(true);
+    setRouteError(null);
+
+    fetchRoadRouteApi(sourceLoc.lat, sourceLoc.lng, facilityLoc.lat, facilityLoc.lng)
+      .then((result) => {
+        if (isCancelled) return;
+        setRoadRoute(result);
+        if (result.isFallback) {
+          setRouteError(result.message || 'Road route unavailable — showing direct estimate');
+        } else {
+          setRouteError(null);
+        }
+        onRouteCalculatedRef.current?.(result);
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        console.warn('Road routing request error:', err);
+        setRouteError('Road route unavailable — showing direct estimate');
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingRoute(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [sourceLoc?.lat, sourceLoc?.lng, facilityLoc?.lat, facilityLoc?.lng]);
+
+  // Determine active route metrics (OSRM road route preferred, Haversine fallback)
   let routeSummary: {
     sourceName: string;
     facilityName: string;
@@ -40,49 +134,69 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
     transportEmissions: number;
     sourceCoords: [number, number];
     facilityCoords: [number, number];
+    isRoadRouted: boolean;
   } | null = null;
 
-  if (activeLot && activeLot.fingerprint?.location && activeLot.matchedFacilityLocation) {
-    const sLat = activeLot.fingerprint.location.lat;
-    const sLng = activeLot.fingerprint.location.lng;
-    const fLat = activeLot.matchedFacilityLocation.lat;
-    const fLng = activeLot.matchedFacilityLocation.lng;
+  let activeRoutePositions: [number, number][] = [];
 
-    const dist = calculateHaversineDistanceKm(sLat, sLng, fLat, fLng) || activeLot.logistics?.distanceKm || 18.4;
-    const mins = calculateTravelTimeMinutes(dist);
-    const emissions = calculateTransportEmissionsCO2e(dist, activeLot.fingerprint.quantityTonnes || 10);
+  if (activeLot && sourceLoc && facilityLoc) {
+    const sLat = sourceLoc.lat;
+    const sLng = sourceLoc.lng;
+    const fLat = facilityLoc.lat;
+    const fLng = facilityLoc.lng;
 
-    routeSummary = {
-      sourceName: activeLot.generatorName || activeLot.fingerprint.location.name || 'Ahmedabad Farm',
-      facilityName: activeLot.matchedFacilityName || 'GreenBio Biochar Plant',
-      distanceKm: dist,
-      travelTimeMins: mins,
-      transportEmissions: emissions,
-      sourceCoords: [sLat, sLng],
-      facilityCoords: [fLat, fLng],
-    };
+    const isRoadRouted = Boolean(roadRoute && !roadRoute.isFallback && roadRoute.geometry?.coordinates?.length);
+
+    if (isRoadRouted && roadRoute) {
+      // Convert OSRM GeoJSON [longitude, latitude] to Leaflet [latitude, longitude]
+      activeRoutePositions = roadRoute.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]);
+      const dist = roadRoute.distanceKm;
+      const mins = roadRoute.durationMinutes;
+      const emissions = calculateTransportEmissionsCO2e(dist, activeLot.fingerprint.quantityTonnes || 10);
+
+      routeSummary = {
+        sourceName: activeLot.generatorName || sourceLoc.name || 'Waste Origin',
+        facilityName: activeLot.matchedFacilityName || 'Selected Facility',
+        distanceKm: dist,
+        travelTimeMins: mins,
+        transportEmissions: emissions,
+        sourceCoords: [sLat, sLng],
+        facilityCoords: [fLat, fLng],
+        isRoadRouted: true,
+      };
+    } else {
+      // Fallback straight-line
+      activeRoutePositions = [[sLat, sLng], [fLat, fLng]];
+      const dist = calculateHaversineDistanceKm(sLat, sLng, fLat, fLng) || activeLot.logistics?.distanceKm || 18.4;
+      const mins = calculateTravelTimeMinutes(dist);
+      const emissions = calculateTransportEmissionsCO2e(dist, activeLot.fingerprint.quantityTonnes || 10);
+
+      routeSummary = {
+        sourceName: activeLot.generatorName || sourceLoc.name || 'Waste Origin',
+        facilityName: activeLot.matchedFacilityName || 'Selected Facility',
+        distanceKm: dist,
+        travelTimeMins: mins,
+        transportEmissions: emissions,
+        sourceCoords: [sLat, sLng],
+        facilityCoords: [fLat, fLng],
+        isRoadRouted: false,
+      };
+    }
   }
 
-  // Filter all active routes for rendering polylines
-  const activeRoutes = wasteLots
-    .filter((lot) => lot.matchedFacilityLocation && lot.fingerprint?.location)
+  // Filter other active routes for background rendering
+  const backgroundRoutes = wasteLots
+    .filter((lot) => lot.id !== activeLot?.id && lot.matchedFacilityLocation && lot.fingerprint?.location)
     .map((lot) => {
       const sLat = lot.fingerprint.location.lat;
       const sLng = lot.fingerprint.location.lng;
       const fLat = lot.matchedFacilityLocation!.lat;
       const fLng = lot.matchedFacilityLocation!.lng;
-      const dist = calculateHaversineDistanceKm(sLat, sLng, fLat, fLng);
 
       return {
         lotId: lot.id,
-        lotStatus: lot.status,
-        sourceName: lot.generatorName || lot.fingerprint.location.name,
         sourceCoords: [sLat, sLng] as [number, number],
-        facilityName: lot.matchedFacilityName || 'Facility',
         facilityCoords: [fLat, fLng] as [number, number],
-        quantity: lot.fingerprint.quantityTonnes,
-        wasteType: lot.fingerprint.wasteType,
-        distanceKm: dist,
       };
     });
 
@@ -102,14 +216,33 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         </div>
       </div>
 
-      {/* Floating Prototype Route Visualization Summary Badge */}
+      {/* Floating Route Visualization Summary Badge */}
       {routeSummary && (
-        <div className="absolute bottom-4 left-4 right-4 sm:right-auto z-10 bg-surface/95 backdrop-blur-md border border-border p-3 rounded-card shadow-modal max-w-md space-y-2 text-xs">
-          <div className="flex items-center justify-between border-b border-border pb-1.5">
-            <span className="font-extrabold text-carbon-primary flex items-center gap-1.5">
+        <div className="absolute bottom-4 left-4 right-4 sm:right-auto z-10 bg-surface/95 backdrop-blur-md border border-border p-3.5 rounded-card shadow-modal max-w-md space-y-2.5 text-xs">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <div className="flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-brand-primary" />
-              <span>Haversine GIS Route Visualization</span>
-            </span>
+              <span className="font-extrabold text-carbon-primary">
+                {isLoadingRoute
+                  ? 'Calculating road route...'
+                  : routeError || !routeSummary.isRoadRouted
+                  ? 'Road route unavailable — showing direct estimate'
+                  : 'OSRM Road Network Route'}
+              </span>
+            </div>
+            {isLoadingRoute ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-brand-primary font-bold animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" /> Routing...
+              </span>
+            ) : routeError || !routeSummary.isRoadRouted ? (
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                Direct Estimate
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span> Road Route
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -125,12 +258,14 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
           <div className="grid grid-cols-3 gap-2 bg-surface-muted/70 p-2 rounded-btn text-center text-[11px]">
             <div>
-              <span className="text-[10px] text-carbon-muted block">Distance</span>
+              <span className="text-[10px] text-carbon-muted block">
+                {routeSummary.isRoadRouted ? 'Road Distance' : 'Direct Distance'}
+              </span>
               <span className="font-extrabold text-carbon-primary">{routeSummary.distanceKm} km</span>
             </div>
             <div>
               <span className="text-[10px] text-carbon-muted block">Estimated Travel Time</span>
-              <span className="font-extrabold text-blue-700">{routeSummary.travelTimeMins} mins</span>
+              <span className="font-extrabold text-blue-700">{routeSummary.travelTimeMins} min</span>
             </div>
             <div>
               <span className="text-[10px] text-carbon-muted block">Transport Emissions</span>
@@ -149,28 +284,41 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           style={{ width: '100%', height: '100%' }}
         >
           <ZoomControl position="topright" />
+          {/* Automatically fit map bounds to the road route */}
+          {activeRoutePositions.length >= 2 && <MapRouteFitter positions={activeRoutePositions} />}
+
           {/* OpenStreetMap Base Layer */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Active Routes (Polylines) */}
-          {activeRoutes.map((route) => {
-            const isSelected = selectedLotId === route.lotId;
-            return (
-              <Polyline
-                key={`route-${route.lotId}`}
-                positions={[route.sourceCoords, route.facilityCoords]}
-                pathOptions={{
-                  color: isSelected ? '#16794A' : '#2563EB',
-                  weight: isSelected ? 4 : 2.5,
-                  dashArray: route.lotStatus === 'MATCHED' ? '6, 6' : undefined,
-                  opacity: 0.85,
-                }}
-              />
-            );
-          })}
+          {/* Background Routes for other lots */}
+          {backgroundRoutes.map((route) => (
+            <Polyline
+              key={`bg-route-${route.lotId}`}
+              positions={[route.sourceCoords, route.facilityCoords]}
+              pathOptions={{
+                color: '#64748B',
+                weight: 1.5,
+                dashArray: '4, 4',
+                opacity: 0.4,
+              }}
+            />
+          ))}
+
+          {/* Active Primary Route: OSRM Road Network or Direct Fallback */}
+          {routeSummary && activeRoutePositions.length > 0 && (
+            <Polyline
+              positions={activeRoutePositions}
+              pathOptions={{
+                color: routeSummary.isRoadRouted ? '#16794A' : '#2563EB',
+                weight: routeSummary.isRoadRouted ? 4.5 : 3,
+                dashArray: routeSummary.isRoadRouted ? undefined : '6, 6',
+                opacity: 0.9,
+              }}
+            />
+          )}
 
           {/* Waste Source Markers */}
           {wasteLots.map((lot) => {

@@ -170,6 +170,125 @@ export async function lookupPincodeApi(pincode: string): Promise<PincodeLocation
   };
 }
 
+// ---------------------------------------------------------------------------
+// GIS ROAD ROUTING SERVICE (OSRM + EXPRESS BACKEND)
+// ---------------------------------------------------------------------------
+
+export interface RoadRouteResult {
+  success: boolean;
+  distanceMeters: number;
+  distanceKm: number;
+  durationSeconds: number;
+  durationMinutes: number;
+  geometry: {
+    type: 'LineString';
+    coordinates: [number, number][]; // GeoJSON [longitude, latitude]
+  };
+  steps?: any[];
+  isFallback?: boolean;
+  fromCache?: boolean;
+  message?: string;
+}
+
+const clientRouteCache = new Map<string, RoadRouteResult>();
+
+/**
+ * Helper to compute straight-line fallback distance and duration
+ */
+function getHaversineFallback(sLat: number, sLng: number, dLat: number, dLng: number) {
+  const R = 6371;
+  const dLatRad = ((dLat - sLat) * Math.PI) / 180;
+  const dLngRad = ((dLng - sLng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLatRad / 2) * Math.sin(dLatRad / 2) +
+    Math.cos((sLat * Math.PI) / 180) *
+      Math.cos((dLat * Math.PI) / 180) *
+      Math.sin(dLngRad / 2) *
+      Math.sin(dLngRad / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const dist = Math.max(1, Math.round(R * c * 10) / 10);
+  const mins = Math.max(5, Math.round((dist / 35) * 60));
+  return { dist, mins };
+}
+
+/**
+ * Fetches real driving road route using CarbonCycle Express backend -> OSRM
+ */
+export async function fetchRoadRouteApi(
+  sourceLat: number,
+  sourceLng: number,
+  destinationLat: number,
+  destinationLng: number
+): Promise<RoadRouteResult> {
+  const cacheKey = `${sourceLat.toFixed(5)},${sourceLng.toFixed(5)}->${destinationLat.toFixed(5)},${destinationLng.toFixed(5)}`;
+  const cached = clientRouteCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // 1. Try CarbonCycle Express Backend (/api/routes/route)
+  try {
+    const url = `${API_BASE_URL}/routes/route?sourceLat=${sourceLat}&sourceLng=${sourceLng}&destinationLat=${destinationLat}&destinationLng=${destinationLng}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data: RoadRouteResult = await res.json();
+      if (data.success && data.geometry?.coordinates?.length) {
+        clientRouteCache.set(cacheKey, data);
+        return data;
+      }
+    }
+  } catch (backendErr) {
+    console.warn('[Routing Warning]: Backend routing failed, attempting direct OSRM fallback', backendErr);
+  }
+
+  // 2. Client-side direct OSRM fallback if backend is unreachable
+  try {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${sourceLng},${sourceLat};${destinationLng},${destinationLat}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+    const osrmRes = await fetch(osrmUrl);
+    if (osrmRes.ok) {
+      const osrmData = await osrmRes.json();
+      if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
+        const route = osrmData.routes[0];
+        const result: RoadRouteResult = {
+          success: true,
+          distanceMeters: Math.round(route.distance),
+          distanceKm: Number((route.distance / 1000).toFixed(1)),
+          durationSeconds: Math.round(route.duration),
+          durationMinutes: Math.max(1, Math.round(route.duration / 60)),
+          geometry: route.geometry,
+          steps: route.legs?.[0]?.steps || [],
+          isFallback: false,
+        };
+        clientRouteCache.set(cacheKey, result);
+        return result;
+      }
+    }
+  } catch (clientErr) {
+    console.warn('[Routing Warning]: Direct OSRM fallback failed', clientErr);
+  }
+
+  // 3. Graceful Straight-Line Fallback
+  const fallback = getHaversineFallback(sourceLat, sourceLng, destinationLat, destinationLng);
+  const fallbackResult: RoadRouteResult = {
+    success: true,
+    distanceMeters: Math.round(fallback.dist * 1000),
+    distanceKm: fallback.dist,
+    durationSeconds: fallback.mins * 60,
+    durationMinutes: fallback.mins,
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [sourceLng, sourceLat],
+        [destinationLng, destinationLat],
+      ],
+    },
+    steps: [],
+    isFallback: true,
+    message: 'Road route unavailable — showing direct estimate',
+  };
+  return fallbackResult;
+}
+
 export async function fetchWasteLotsApi(): Promise<WasteLot[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/waste-lots`);

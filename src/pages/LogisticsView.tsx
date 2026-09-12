@@ -1,7 +1,7 @@
 import React from 'react';
 import { Facility, WasteLot, WasteStatus } from '../types';
 import { NetworkMap } from '../components/map/NetworkMap';
-import { updateLotLifecycleStatus } from '../services/store';
+import { updateLotLifecycleStatus, RoadRouteResult } from '../services/store';
 import { calculateHaversineDistanceKm, calculateTravelTimeMinutes, calculateTransportEmissionsCO2e } from '../utils/haversine';
 import { Truck, MapPin, Navigation, Clock, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 
@@ -29,7 +29,14 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
 
   const { fingerprint, matchedFacilityName, matchedFacilityLocation, logistics, status } = activeLot;
 
-  const distanceKm = (fingerprint?.location && matchedFacilityLocation)
+  const [roadRoute, setRoadRoute] = React.useState<RoadRouteResult | null>(null);
+  const [isUpdating, setIsUpdating] = React.useState(false);
+
+  React.useEffect(() => {
+    setRoadRoute(null);
+  }, [activeLot?.id]);
+
+  const fallbackDistanceKm = (fingerprint?.location && matchedFacilityLocation)
     ? (calculateHaversineDistanceKm(
         fingerprint.location.lat,
         fingerprint.location.lng,
@@ -38,9 +45,9 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
       ) || 18.4)
     : (logistics?.distanceKm || 18.4);
 
-  const [isUpdating, setIsUpdating] = React.useState(false);
-
-  const travelTimeMins = calculateTravelTimeMinutes(distanceKm);
+  const hasRoadRoute = Boolean(roadRoute && !roadRoute.isFallback);
+  const distanceKm = hasRoadRoute ? roadRoute!.distanceKm : fallbackDistanceKm;
+  const travelTimeMins = hasRoadRoute ? roadRoute!.durationMinutes : calculateTravelTimeMinutes(distanceKm);
   const transportEmissions = calculateTransportEmissionsCO2e(distanceKm, fingerprint?.quantityTonnes || 10);
 
   const handleNextStatus = async () => {
@@ -122,7 +129,7 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
 
               <div className="pl-3 border-l-2 border-dashed border-border ml-3 my-1 py-1.5 flex items-center justify-between text-[11px]">
                 <span className="font-bold text-brand-primary">
-                  {distanceKm} km Haversine Distance
+                  {distanceKm} km {hasRoadRoute ? 'Road Distance' : 'Direct Distance'}
                 </span>
                 <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
                   ⏱ {travelTimeMins} mins est. travel time
@@ -229,6 +236,7 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
             facilities={facilities}
             selectedLotId={activeLot.id}
             height="560px"
+            onRouteCalculated={setRoadRoute}
           />
         </div>
 
