@@ -184,6 +184,9 @@ function AppContent() {
     );
   }
 
+  const hideNavbarTabs: NavTab[] = ['DASHBOARD', 'RECOMMENDATION', 'ADD_WASTE', 'CARBON', 'ANALYTICS'];
+  const showTopbar = !hideNavbarTabs.includes(currentTab);
+
   return (
     <div className="flex min-h-screen bg-canvas text-carbon-primary font-sans">
       
@@ -307,6 +310,7 @@ function AppContent() {
               wasteLots={wasteLots}
               onUpdateLotStatus={handleUpdateLotStatus}
               onOpenReport={(lot) => setOpenReportLot(lot)}
+              searchQuery={searchQuery}
             />
           )}
 
@@ -328,6 +332,7 @@ function AppContent() {
             <ReportsView
               wasteLots={wasteLots}
               onOpenReport={(lot) => setOpenReportLot(lot)}
+              searchQuery={searchQuery}
             />
           )}
         </main>

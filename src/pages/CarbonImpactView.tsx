@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WasteLot } from '../types';
 import { CalculationDrawer } from '../components/carbon/CalculationDrawer';
 import { Leaf, Calculator, ArrowUpRight, ShieldCheck, Factory, Truck, ChevronRight } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, ReferenceLine } from 'recharts';
 
 interface CarbonImpactViewProps {
   wasteLots: WasteLot[];
@@ -27,6 +27,7 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -54,26 +55,52 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
         </p>
       </div>
 
-      {/* Waterfall Contribution Breakdown Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Waterfall Contribution Breakdown Chart & Accounting Summary Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
-        <div className="lg:col-span-7 bg-surface border border-border rounded-card p-5 space-y-4 shadow-subtle">
-          <div className="flex items-center justify-between border-b border-border pb-3">
+        {/* Left Column: CO2e Waterfall Bar Chart */}
+        <div className="lg:col-span-7 bg-surface border border-border rounded-card p-5 shadow-subtle flex flex-col justify-between h-full min-h-[420px]">
+          <div className="flex items-center justify-between border-b border-border pb-3 flex-shrink-0">
             <div>
               <h2 className="font-bold text-sm text-carbon-primary">CO₂e Contribution Waterfall</h2>
               <p className="text-xs text-carbon-secondary">Positive diversion gains vs logistics penalties</p>
             </div>
+            <span className="text-[11px] font-semibold text-carbon-secondary bg-surface-muted px-2.5 py-0.5 rounded-full border border-border/60">
+              Net Impact View
+            </span>
           </div>
 
-          <div className="h-64 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={waterfallData}>
-                <XAxis dataKey="category" stroke="#89928C" fontSize={11} tickLine={false} />
-                <YAxis stroke="#89928C" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E3E7E3', borderRadius: '8px', fontSize: '11px' }}
+          <div className="w-full flex-1 min-h-[290px] pt-3 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={290}>
+              <BarChart data={waterfallData} margin={{ top: 15, right: 15, left: -5, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ECEFEC" vertical={false} />
+                <XAxis 
+                  dataKey="category" 
+                  stroke="#89928C" 
+                  fontSize={11} 
+                  tickLine={false}
+                  tick={{ fill: '#68736C' }}
+                  dy={4}
                 />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                <YAxis 
+                  stroke="#89928C" 
+                  fontSize={11} 
+                  tickLine={false}
+                  tick={{ fill: '#68736C' }}
+                  tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}t`}
+                />
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: '#FFFFFF', 
+                    borderColor: '#E3E7E3', 
+                    borderRadius: '10px', 
+                    fontSize: '11px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)' 
+                  }}
+                  formatter={(val: any) => [`${Number(val) > 0 ? '+' : ''}${Math.round(Number(val)).toLocaleString('en-IN')} tCO₂e`, 'Net Impact']}
+                />
+                <ReferenceLine y={0} stroke="#89928C" strokeDasharray="2 2" />
+                <Bar dataKey="value" radius={[4, 4, 4, 4]} maxBarSize={56}>
                   {waterfallData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -81,14 +108,30 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Symmetrical Bottom Legend Footer */}
+          <div className="pt-3 border-t border-border flex items-center justify-between text-xs flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-carbon-secondary">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#16794A]" />Avoided</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#25A866]" />Stored</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#D99422]" />Transit</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#C95151]" />Processing</span>
+            </div>
+            <span className="text-[11px] font-bold text-brand-dark">Net: +{Math.round(netTotalCO2e).toLocaleString('en-IN')} tCO₂e</span>
+          </div>
         </div>
 
-        {/* Accounting Components Summary */}
-        <div className="lg:col-span-5 bg-surface border border-border rounded-card p-5 space-y-4 shadow-subtle flex flex-col justify-between">
+        {/* Right Column: Accounting Components Summary */}
+        <div className="lg:col-span-5 bg-surface border border-border rounded-card p-5 shadow-subtle flex flex-col justify-between h-full min-h-[420px]">
           <div>
-            <h2 className="font-bold text-sm text-carbon-primary border-b border-border pb-3">
-              Accounting Components
-            </h2>
+            <div className="flex items-center justify-between border-b border-border pb-3 flex-shrink-0">
+              <h2 className="font-bold text-sm text-carbon-primary">
+                Accounting Components
+              </h2>
+              <span className="text-[11px] font-semibold text-carbon-secondary bg-surface-muted px-2.5 py-0.5 rounded-full border border-border/60">
+                Factor Ledger
+              </span>
+            </div>
 
             <div className="space-y-3 mt-3 text-xs">
               <div className="p-3 bg-surface-muted/50 rounded-btn flex justify-between items-center">
@@ -125,10 +168,10 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
             </div>
           </div>
 
-          <div className="pt-2 border-t border-border">
+          <div className="pt-3 border-t border-border flex-shrink-0">
             <button
               onClick={() => setSelectedDrawerLot(wasteLots[0])}
-              className="w-full bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs py-2 rounded-btn shadow-sm flex items-center justify-center gap-2 transition"
+              className="w-full bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs py-2.5 rounded-btn shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
             >
               <Calculator className="w-4 h-4" />
               <span>Inspect Sample Mathematical Calculation</span>

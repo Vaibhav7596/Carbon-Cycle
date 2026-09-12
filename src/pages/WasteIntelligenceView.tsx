@@ -54,10 +54,10 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-1.5 rounded-btn border border-border text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted transition"
-            title="Back to Waste Lots"
+            title="Back to Waste Batches"
+            className="p-2.5 rounded-xl border border-border bg-surface text-carbon-primary hover:bg-surface-muted transition cursor-pointer shadow-xs flex items-center justify-center"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
           <div>
             <div className="flex items-center gap-2">

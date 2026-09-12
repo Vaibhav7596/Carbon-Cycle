@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Bell, ExternalLink, Sparkles, PanelLeftClose, PanelLeftOpen, Cpu } from 'lucide-react';
+import { Search, Bell } from 'lucide-react';
 import { NavTab } from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,8 +17,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSelectTab,
   searchQuery,
   onSearchChange,
-  isSidebarCollapsed = false,
-  onToggleSidebar,
 }) => {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -88,55 +86,32 @@ export const Topbar: React.FC<TopbarProps> = ({
     }
   };
 
-  const titleMap: Record<NavTab, { title: string; subtitle: string }> = {
-    LANDING: { title: 'Welcome to CarbonCycle', subtitle: 'Waste-to-Carbon Decision & Traceability Platform' },
-    DASHBOARD: { 
-      title: user?.role === 'facility_operator' ? 'Facility Operations Dashboard' : 'Network Overview', 
-      subtitle: user?.role === 'facility_operator' 
-        ? 'Real-time conversion capacity, inbound intake pipeline, and durable carbon yields' 
-        : 'Monitor waste flows, conversion capacity, and carbon impact' 
-    },
-    ADMIN_DASHBOARD: { title: 'Dedicated Admin Dashboard', subtitle: 'Global network oversight across generators, facility operators, and users' },
-    WASTE: { 
-      title: user?.role === 'facility_operator' ? 'Inbound Feedstock Batches' : 'Waste Lots', 
-      subtitle: user?.role === 'facility_operator' 
-        ? 'Track incoming feedstock batches routed for facility reactor intake' 
-        : 'Track registered waste batches through the conversion pipeline' 
-    },
-    ADD_WASTE: { title: 'List New Waste Batch', subtitle: 'Generate structured waste fingerprint and run decision engine' },
-    RECOMMENDATION: { title: 'Waste Intelligence & Matching', subtitle: 'Explainable conversion pathway recommendation & facility matching' },
-    FACILITIES: { title: 'Conversion Facilities', subtitle: 'Directory of active biochar, biogas, and composting processing hubs' },
-    LOGISTICS: { title: 'Logistics & GIS Route Tracker', subtitle: 'Source-to-facility route optimization and pickup lifecycle' },
-    PROCESSING: { title: 'Facility Operations Queue', subtitle: 'Real-time monitoring of active waste conversion batches' },
-    CARBON: { title: 'Carbon Intelligence & Accounting', subtitle: 'Transparent breakdown of avoided landfill emissions and carbon stored' },
-    ANALYTICS: { title: 'Network Analytics', subtitle: 'Waste diversion trends, pathway distribution, and climate metrics' },
-    REPORTS: { title: 'Digital Impact Reports', subtitle: 'Auditable digital certificates and traceable batch summaries' },
-  };
-
-  const currentInfo = titleMap[currentTab] || { title: 'CarbonCycle', subtitle: 'Decision Platform' };
+  // Close notifications dropdown when clicking outside
+  React.useEffect(() => {
+    if (!showNotifications) return;
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('#notifications-dropdown-container')) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, [showNotifications]);
 
   return (
-    <header className="h-16 bg-surface border-b border-border px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* Page Title & Breadcrumb */}
-      <div className="flex items-center gap-3">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-1.5 rounded-btn border border-border text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted transition"
-            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar (Widescreen)"}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4 text-brand-primary" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
-        )}
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-medium text-carbon-secondary">
-            <span>CarbonCycle</span>
-            <span>/</span>
-            <span className="text-carbon-primary font-semibold">{currentInfo.title}</span>
-          </div>
-          <h1 className="text-sm font-semibold text-carbon-primary tracking-tight">
-            {currentInfo.subtitle}
-          </h1>
+    <header className="h-16 bg-surface border-b border-border px-6 flex items-center justify-between sticky top-0 z-40 gap-4">
+      {/* Search bar takes prime spot on the left / center */}
+      <div className="flex-1 max-w-lg">
+        <div className="relative w-full">
+          <Search className="w-4 h-4 text-carbon-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search waste, facility, batch ID, or location..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full bg-surface-muted/60 text-sm text-carbon-primary pl-10 pr-4 py-2 rounded-xl border border-border/80 focus:outline-none focus:border-brand-primary focus:bg-surface shadow-xs transition"
+          />
         </div>
       </div>
 
@@ -260,29 +235,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             </div>
           )}
         </div>
-
-        {/* Primary CTA Button */}
-        {user?.role === 'facility_operator' ? (
-          currentTab !== 'PROCESSING' && (
-            <button
-              onClick={() => onSelectTab('PROCESSING')}
-              className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold px-3.5 py-1.5 rounded-btn shadow-sm transition transform active:scale-95"
-            >
-              <Cpu className="w-4 h-4" />
-              <span className="hidden sm:inline">Operations Queue</span>
-            </button>
-          )
-        ) : (
-          currentTab !== 'ADD_WASTE' && (
-            <button
-              onClick={() => onSelectTab('ADD_WASTE')}
-              className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-semibold px-3.5 py-1.5 rounded-btn shadow-sm transition transform active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>List Waste</span>
-            </button>
-          )
-        )}
       </div>
     </header>
   );

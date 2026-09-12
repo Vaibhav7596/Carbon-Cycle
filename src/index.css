@@ -6,12 +6,16 @@
   body {
     @apply bg-canvas text-carbon-primary font-sans antialiased;
   }
+
+  button, select, [role="button"] {
+    cursor: pointer;
+  }
 }
 
 /* Custom Leaflet Map styling tweaks */
 .leaflet-container {
   font-family: 'Inter', sans-serif !important;
-  z-index: 10;
+  z-index: 0 !important;
 }
 
 .custom-map-marker {
@@ -31,17 +35,66 @@
 }
 
 /* Printable Certificate Styles */
+@page {
+  size: A4 portrait;
+  margin: 8mm 10mm;
+}
+
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+  }
+
+  #root {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
   body * {
     visibility: hidden;
   }
-  #printable-certificate, #printable-certificate * {
+
+  #printable-certificate, 
+  #printable-certificate * {
     visibility: visible;
   }
+
   #printable-certificate {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
+

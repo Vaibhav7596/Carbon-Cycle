@@ -32,6 +32,25 @@ export const AuthModal: React.FC = () => {
     }
   }, [isAuthModalOpen]);
 
+  // Lock background body scroll when auth modal is open
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isAuthModalOpen]);
+
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAuthModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAuthModalOpen, setAuthModalOpen]);
   if (!isAuthModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,9 +108,15 @@ export const AuthModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) setAuthModalOpen(false); }}
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       {/* Modal Card with max height & scroll */}
-      <div className="w-full max-w-md bg-surface rounded-container border border-border shadow-modal overflow-hidden max-h-[90vh] flex flex-col my-auto animate-in zoom-in-95 duration-150">
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-surface rounded-container border border-border shadow-modal overflow-hidden max-h-[90vh] flex flex-col my-auto animate-in zoom-in-95 duration-150"
+      >
         
         {/* Fixed Header */}
         <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-surface-muted/40 flex-shrink-0">

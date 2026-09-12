@@ -1,12 +1,37 @@
-import React from 'react';
-import { Leaf, ArrowRight, Factory, Truck, BarChart3, ShieldCheck, CheckCircle2, ChevronRight, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Leaf, ArrowRight, Factory, Truck, BarChart3, ShieldCheck, CheckCircle2, ChevronRight, Zap, ChevronDown, LogOut, Plus } from 'lucide-react';
 import { NavTab } from '../components/layout/Sidebar';
+import { useAuth } from '../context/AuthContext';
 
 interface LandingPageProps {
   onEnterPlatform: (tab: NavTab) => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => {
+  const { user, isAuthenticated, logout } = useAuth();
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dialogue when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsProfileMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfileMenuOpen]);
+
   return (
     <div className="min-h-screen bg-canvas text-carbon-primary font-sans">
       
@@ -20,26 +45,134 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
             <span className="font-extrabold text-sm sm:text-base tracking-wider uppercase text-carbon-primary">
               CarbonCycle
             </span>
-            <span className="text-[10px] text-brand-primary bg-brand-soft px-1.5 py-0.5 rounded font-bold ml-2">
-              CLIMATE-TECH
-            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => onEnterPlatform('DASHBOARD')}
-            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted rounded-btn transition border border-border"
-          >
-            <span>Sign In</span>
-          </button>
-          <button
-            onClick={() => onEnterPlatform('ADD_WASTE')}
-            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95"
-          >
-            <span>Register Waste Batch</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {isAuthenticated && user ? (
+            <div className="relative" ref={profileMenuRef}>
+              {/* Profile Pill Button */}
+              <button
+                type="button"
+                onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                className={`flex items-center gap-2.5 py-1.5 pl-1.5 pr-3 rounded-full border transition-all duration-200 cursor-pointer shadow-subtle active:scale-[0.98] ${
+                  isProfileMenuOpen
+                    ? 'border-brand-primary/70 bg-surface-muted ring-2 ring-brand-primary/15'
+                    : 'border-border bg-surface hover:bg-surface-muted hover:border-carbon-muted/50'
+                }`}
+                aria-haspopup="true"
+                aria-expanded={isProfileMenuOpen}
+                title={`${user.name} (${user.organizationName})`}
+              >
+                <div className="w-8 h-8 aspect-square rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs bg-zinc-200 border border-zinc-300 text-zinc-800 shadow-xs">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="text-left hidden sm:block pr-0.5">
+                  <p className="text-xs font-bold text-carbon-primary leading-tight truncate max-w-[130px]">
+                    {user.name}
+                  </p>
+                  <p className="text-[10px] text-carbon-secondary leading-tight truncate max-w-[130px]">
+                    {user.organizationName}
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-carbon-muted transition-transform duration-200 ${
+                    isProfileMenuOpen ? 'rotate-180 text-brand-primary' : ''
+                  }`}
+                />
+              </button>
+
+              {/* Profile Dialogue Box */}
+              {isProfileMenuOpen && (
+                <div
+                  className="absolute right-0 top-full mt-2.5 w-72 bg-surface border border-border rounded-2xl shadow-modal p-4 space-y-3.5 animate-in fade-in-50 zoom-in-95 duration-150 z-[100]"
+                  role="dialog"
+                  aria-label="User Profile Menu"
+                >
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-muted/60 border border-border/70">
+                    <div className="w-10 h-10 aspect-square rounded-full flex-shrink-0 flex items-center justify-center font-extrabold text-xs bg-zinc-200 border border-zinc-300 text-zinc-800 shadow-xs">
+                      {user.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-extrabold text-xs text-carbon-primary truncate leading-tight">
+                        {user.name}
+                      </p>
+                      <p className="text-[10px] text-carbon-secondary truncate font-medium mt-0.5">
+                        {user.organizationName}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-brand-soft text-brand-dark border border-brand-primary/20">
+                          <ShieldCheck className="w-2.5 h-2.5 text-brand-primary" />
+                          {user.role}
+                        </span>
+                        {user.organizationType && (
+                          <span className="text-[9px] text-carbon-muted truncate">
+                            · {user.organizationType}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-0.5">
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        onEnterPlatform('DASHBOARD');
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-brand-soft text-brand-dark hover:bg-brand-primary hover:text-white font-bold text-xs transition group cursor-pointer shadow-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        <span>Go to Dashboard</span>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        onEnterPlatform('ADD_WASTE');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted transition cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 text-brand-primary" />
+                      <span>Register Waste Batch</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-border/80 pt-2">
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-red-600 hover:bg-red-50 rounded-xl border border-red-200/80 font-semibold transition cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => onEnterPlatform('DASHBOARD')}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted rounded-btn transition border border-border"
+              >
+                <span>Sign In</span>
+              </button>
+              <button
+                onClick={() => onEnterPlatform('ADD_WASTE')}
+                className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95 cursor-pointer"
+              >
+                <span>Register Waste Batch</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
