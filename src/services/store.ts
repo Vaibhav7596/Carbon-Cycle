@@ -1,11 +1,12 @@
 import { SEEDED_FACILITIES, SEEDED_WASTE_LOTS } from '../data/constants';
-import { Facility, PathwayType, WasteFingerprint, WasteLot, WasteStatus } from '../types';
+import { Facility, NotificationItem, PathwayType, WasteFingerprint, WasteLot, WasteStatus } from '../types';
 import { calculateBatchImpact } from './carbonCalculator';
 import { calculateHaversineDistance, evaluatePathwaySuitability } from './recommendationEngine';
 import { API_BASE_URL } from './authService';
 
 const STORAGE_KEY_LOTS = 'carboncycle_waste_lots_v1';
 const STORAGE_KEY_FACILITIES = 'carboncycle_facilities_v1';
+const STORAGE_KEY_NOTIFICATIONS = 'carboncycle_notifications_v1';
 
 // Synchronous local cache helpers
 export function getStoredWasteLots(): WasteLot[] {
@@ -41,6 +42,24 @@ export function saveStoredFacilities(facilities: Facility[]): void {
     localStorage.setItem(STORAGE_KEY_FACILITIES, JSON.stringify(facilities));
   } catch (e) {
     console.error('Failed to save facilities to local storage', e);
+  }
+}
+
+export function getStoredNotifications(): NotificationItem[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
+    if (data) return JSON.parse(data);
+  } catch (e) {
+    console.error('Failed to load notifications from local storage', e);
+  }
+  return [];
+}
+
+export function saveStoredNotifications(items: NotificationItem[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(items));
+  } catch (e) {
+    console.error('Failed to save notifications to local storage', e);
   }
 }
 
@@ -101,7 +120,6 @@ export async function createWasteLotApi(
   } catch (error) {
     console.error('[Store API Error]: Failed to create waste lot on server, falling back to local.', error);
   }
-  // Fallback to local creation if network is down
   return createNewWasteLot(generatorName, generatorType, fingerprint);
 }
 
@@ -130,8 +148,134 @@ export async function matchAndSelectFacilityApi(
   } catch (error) {
     console.error('[Store API Error]: Failed to match facility on server, falling back to local.', error);
   }
-  // Fallback to local matching
   return matchAndSelectFacilityForLot(lotId, facilityId);
+}
+
+// Alias for readability
+export const requestFacilityMatchApi = matchAndSelectFacilityApi;
+
+export async function respondToMatchRequestApi(
+  lotId: string,
+  action: 'ACCEPT' | 'REJECT',
+  rejectionReason?: string,
+  facilityId?: string
+): Promise<WasteLot | null> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/waste-lots/${lotId}/respond-match`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ action, rejectionReason, facilityId }),
+    });
+
+    const json = await res.json();
+    if (json.success && json.lot) {
+      const current = getStoredWasteLots();
+      const updated = current.map((l) => (l.id === lotId ? json.lot : l));
+      saveStoredWasteLots(updated);
+      return json.lot;
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to respond to match request on server, falling back to local.', error);
+  }
+  return respondToMatchRequestForLot(lotId, action, rejectionReason);
+}
+
+export async function notifyGateArrivalApi(
+  lotId: string
+): Promise<WasteLot | null> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/waste-lots/${lotId}/gate-arrival`, {
+      method: 'PUT',
+      headers,
+    });
+
+    const json = await res.json();
+    if (json.success && json.lot) {
+      const current = getStoredWasteLots();
+      const updated = current.map((l) => (l.id === lotId ? json.lot : l));
+      saveStoredWasteLots(updated);
+      return json.lot;
+    }
+  } catch (error) {
+    console.error('[Store API Error]: Failed to notify gate arrival on server, falling back to local.', error);
+  }
+  return notifyGateArrivalForLot(lotId);
+}
+
+// ---------------------------------------------------------------------------
+// NOTIFICATIONS API
+// ---------------------------------------------------------------------------
+
+export async function fetchNotificationsApi(params?: {
+  role?: string;
+  email?: string;
+  facilityId?: string;
+}): Promise<NotificationItem[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.role) query.append('role', params.role);
+    if (params?.email) query.append('email', params.email);
+    if (params?.facilityId) query.append('facilityId', params.facilityId);
+
+    const res = await fetch(`${API_BASE_URL}/notifications?${query.toString()}`);
+    const json = await res.json();
+    if (json.success && Array.isArray(json.notifications)) {
+      saveStoredNotifications(json.notifications);
+      return json.notifications;
+    }
+  } catch (error) {
+    console.warn('[Notifications API Warning]: Failed to fetch notifications from server, using cached.', error);
+  }
+  return getStoredNotifications();
+}
+
+export async function markNotificationReadApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, { method: 'PUT' });
+    const json = await res.json();
+    if (json.success) {
+      const current = getStoredNotifications();
+      saveStoredNotifications(current.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      return true;
+    }
+  } catch (error) {
+    console.error('[Notifications API Error]: Failed to mark notification read on server.', error);
+  }
+  const current = getStoredNotifications();
+  saveStoredNotifications(current.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  return true;
+}
+
+export async function markAllNotificationsReadApi(params?: {
+  role?: string;
+  email?: string;
+}): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params || {}),
+    });
+    const json = await res.json();
+    if (json.success) {
+      const current = getStoredNotifications();
+      saveStoredNotifications(current.map((n) => ({ ...n, read: true })));
+      return true;
+    }
+  } catch (error) {
+    console.error('[Notifications API Error]: Failed to mark all notifications read on server.', error);
+  }
+  const current = getStoredNotifications();
+  saveStoredNotifications(current.map((n) => ({ ...n, read: true })));
+  return true;
 }
 
 export async function updateLotLifecycleStatusApi(
@@ -345,3 +489,58 @@ export function updateLotLifecycleStatus(
   saveStoredWasteLots(lots);
   return lot;
 }
+
+export function respondToMatchRequestForLot(
+  lotId: string,
+  action: 'ACCEPT' | 'REJECT',
+  rejectionReason?: string
+): WasteLot | null {
+  const lots = getStoredWasteLots();
+  const lotIndex = lots.findIndex((l) => l.id === lotId);
+  if (lotIndex === -1) return null;
+
+  const lot = lots[lotIndex];
+  const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+
+  if (action === 'ACCEPT') {
+    lot.status = 'MATCHED';
+    lot.matchedFacilityId = lot.requestedFacilityId || lot.matchedFacilityId;
+    lot.matchedFacilityName = lot.requestedFacilityName || lot.matchedFacilityName;
+    lot.timeline.push({
+      status: 'MATCHED',
+      timestamp: dateStr,
+      note: `Facility intake accepted by ${lot.matchedFacilityName}. Collection scheduled.`,
+    });
+  } else {
+    lot.status = 'REJECTED';
+    lot.rejectionReason = rejectionReason || 'Capacity constraints';
+    lot.timeline.push({
+      status: 'REJECTED',
+      timestamp: dateStr,
+      note: `Intake rejected: ${lot.rejectionReason}`,
+    });
+  }
+
+  saveStoredWasteLots(lots);
+  return lot;
+}
+
+export function notifyGateArrivalForLot(lotId: string): WasteLot | null {
+  const lots = getStoredWasteLots();
+  const lotIndex = lots.findIndex((l) => l.id === lotId);
+  if (lotIndex === -1) return null;
+
+  const lot = lots[lotIndex];
+  const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+  lot.status = 'AT_GATE';
+  lot.gateArrivalTime = new Date().toISOString();
+  lot.timeline.push({
+    status: 'AT_GATE',
+    timestamp: dateStr,
+    note: 'Truck arrived at facility intake gate. Queued for weighbridge check-in.',
+  });
+
+  saveStoredWasteLots(lots);
+  return lot;
+}
+

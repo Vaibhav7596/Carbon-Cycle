@@ -3,7 +3,7 @@ import { Facility, WasteLot } from '../types';
 import { evaluatePathwaySuitability, matchFacilitiesForWaste } from '../services/recommendationEngine';
 import { ExplainableMatchCard } from '../components/matching/ExplainableMatchCard';
 import { WASTE_TYPE_LABELS } from '../data/constants';
-import { Sparkles, MapPin, Scale, Leaf, ArrowLeft, CheckCircle2, Factory, ChevronRight, Award, ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Sparkles, MapPin, Scale, Leaf, ArrowLeft, CheckCircle2, Factory, ChevronRight, Award, ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen, AlertCircle, Clock } from 'lucide-react';
 
 interface WasteIntelligenceViewProps {
   lot: WasteLot;
@@ -27,11 +27,11 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
 
   // Run Recommendation Engine
   const pathwaySuitabilities = evaluatePathwaySuitability(fingerprint);
-  const [selectedPathway, setSelectedPathway] = useState(pathwaySuitabilities[0].pathway);
+  const [selectedPathway, setSelectedPathway] = useState(lot.selectedPathway || pathwaySuitabilities[0].pathway);
 
-  // Collapsible toggle states to declutter the viewport
+  // Collapsible toggle states to declutter the viewport (auto-open alternatives if previously rejected)
   const [showAllPathways, setShowAllPathways] = useState(false);
-  const [showAllAlternatives, setShowAllAlternatives] = useState(false);
+  const [showAllAlternatives, setShowAllAlternatives] = useState(lot.status === 'REJECTED');
 
   // Run Facility Matcher for selected pathway
   const matchedResults = matchFacilitiesForWaste(fingerprint, facilities, selectedPathway);
@@ -93,6 +93,49 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
           </button>
         )}
       </div>
+
+      {/* Rejection Notification Banner */}
+      {lot.status === 'REJECTED' && (
+        <div className="bg-rose-50 border border-rose-200 p-4 rounded-card flex items-start gap-3.5 text-xs text-rose-900 shadow-sm animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm text-rose-950">
+                Intake Request Declined by {lot.requestedFacilityName || 'Selected Facility'}
+              </span>
+              <span className="text-[10px] font-bold uppercase bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded">
+                Alternative Required
+              </span>
+            </div>
+            <p className="text-rose-800">
+              Reason provided by facility: <span className="font-semibold italic">"{lot.rejectionReason || 'Facility intake capacity limits or quality parameters'}"</span>
+            </p>
+            <p className="text-[11px] text-rose-700 font-medium">
+              We've unlocked all alternative compatible conversion centers below. Review ranking scores and send an intake request to an available facility.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Intake Notification Banner */}
+      {lot.status === 'MATCH_REQUESTED' && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-card flex items-start gap-3.5 text-xs text-amber-900 shadow-sm animate-fadeIn">
+          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5 animate-spin" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm text-amber-950">
+                Intake Request Pending Facility Review ({lot.requestedFacilityName || 'Facility'})
+              </span>
+              <span className="text-[10px] font-bold uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded">
+                Awaiting Operator
+              </span>
+            </div>
+            <p className="text-amber-800">
+              The facility manager at {lot.requestedFacilityName || 'the conversion facility'} has received your waste fingerprint. Once accepted, logistics dispatch and pickup windows will be confirmed automatically.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2-Column Grid: Left Fingerprint, Pathways & Alternatives / Right Hero Facility Match */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -219,6 +262,11 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
             <ExplainableMatchCard
               match={topMatch}
               isTopMatch={true}
+              lotStatus={lot.status}
+              isRequested={lot.status === 'MATCH_REQUESTED' && (lot.requestedFacilityId === topMatch.facility.id || lot.requestedFacilityName === topMatch.facility.name)}
+              isMatched={lot.matchedFacilityId === topMatch.facility.id && lot.status !== 'REJECTED'}
+              isRejected={lot.status === 'REJECTED' && lot.requestedFacilityId === topMatch.facility.id}
+              rejectionReason={lot.rejectionReason}
               onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
             />
           ) : (
@@ -268,6 +316,11 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
                         key={altMatch.facility.id}
                         match={altMatch}
                         isTopMatch={false}
+                        lotStatus={lot.status}
+                        isRequested={lot.status === 'MATCH_REQUESTED' && (lot.requestedFacilityId === altMatch.facility.id || lot.requestedFacilityName === altMatch.facility.name)}
+                        isMatched={lot.matchedFacilityId === altMatch.facility.id && lot.status !== 'REJECTED'}
+                        isRejected={lot.status === 'REJECTED' && lot.requestedFacilityId === altMatch.facility.id}
+                        rejectionReason={lot.rejectionReason}
                         onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
                       />
                     ))}

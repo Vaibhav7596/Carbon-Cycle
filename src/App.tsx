@@ -24,6 +24,8 @@ import {
   getStoredFacilities,
   getStoredWasteLots,
   matchAndSelectFacilityApi,
+  respondToMatchRequestApi,
+  notifyGateArrivalApi,
   resetDemoDataApi,
   updateLotLifecycleStatusApi,
 } from './services/store';
@@ -34,6 +36,7 @@ function AppContent() {
   // Default to LANDING if unauthenticated, or appropriate dashboard if authenticated
   const [currentTab, setCurrentTab] = useState<NavTab>('LANDING');
   const [previousTab, setPreviousTab] = useState<NavTab>('DASHBOARD');
+  const [pendingTab, setPendingTab] = useState<NavTab | null>(null);
 
   const [wasteLots, setWasteLots] = useState<WasteLot[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -79,6 +82,9 @@ function AppContent() {
   useEffect(() => {
     if (!isAuthenticated) {
       setCurrentTab('LANDING');
+    } else if (pendingTab) {
+      setCurrentTab(pendingTab);
+      setPendingTab(null);
     } else if (user?.role === 'admin') {
       setCurrentTab('ADMIN_DASHBOARD');
     } else if (user?.role === 'facility_operator') {
@@ -90,6 +96,7 @@ function AppContent() {
 
   const handleNavigate = (tab: NavTab) => {
     if (tab !== 'LANDING' && !isAuthenticated) {
+      setPendingTab(tab);
       setAuthModalOpen(true);
       return;
     }
@@ -128,8 +135,32 @@ function AppContent() {
     if (updatedLot) {
       setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
       setSelectedLotId(lotId);
-      setCurrentTab('LOGISTICS');
-      showToast(`Batch ${lotId} matched with ${updatedLot.matchedFacilityName}`);
+      showToast(`Intake request submitted to ${updatedLot.requestedFacilityName || 'facility'}. Facility operator notified.`);
+    }
+  };
+
+  const handleRespondToMatchRequest = async (
+    lotId: string,
+    action: 'ACCEPT' | 'REJECT',
+    rejectionReason?: string,
+    facilityId?: string
+  ) => {
+    const updatedLot = await respondToMatchRequestApi(lotId, action, rejectionReason, facilityId);
+    if (updatedLot) {
+      setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
+      if (action === 'ACCEPT') {
+        showToast(`Intake request ACCEPTED for batch ${lotId}. Collection logistics scheduled.`);
+      } else {
+        showToast(`Intake request REJECTED for batch ${lotId}. Generator notified.`);
+      }
+    }
+  };
+
+  const handleNotifyGateArrival = async (lotId: string) => {
+    const updatedLot = await notifyGateArrivalApi(lotId);
+    if (updatedLot) {
+      setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
+      showToast(`Truck arrival recorded at gate for batch ${lotId}. Intake alerted.`);
     }
   };
 
@@ -175,17 +206,15 @@ function AppContent() {
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         
-        {/* Topbar Header (hidden specifically on Overview) */}
-        {currentTab !== 'DASHBOARD' && (
-          <Topbar
-            currentTab={currentTab}
-            onSelectTab={handleNavigate}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          />
-        )}
+        {/* Topbar Header with Live MongoDB Notifications */}
+        <Topbar
+          currentTab={currentTab}
+          onSelectTab={handleNavigate}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
 
         {/* View Router Body */}
         <main className="flex-1 overflow-y-auto pb-12">
@@ -207,6 +236,8 @@ function AppContent() {
                   setCurrentTab('LOGISTICS');
                 }}
                 onUpdateLotStatus={handleUpdateLotStatus}
+                onRespondToMatchRequest={handleRespondToMatchRequest}
+                onNotifyGateArrival={handleNotifyGateArrival}
                 onOpenReport={(lot) => setOpenReportLot(lot)}
               />
             ) : (

@@ -26,12 +26,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onEnterPlatform('DASHBOARD')}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted rounded-btn transition border border-border"
+          >
+            <span>Sign In</span>
+          </button>
           <button
             onClick={() => onEnterPlatform('ADD_WASTE')}
             className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95"
           >
-            <span>Get Started</span>
+            <span>Register Waste Batch</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

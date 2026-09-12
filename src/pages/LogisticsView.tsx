@@ -45,7 +45,8 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
     let nextSt: WasteStatus = 'PICKUP';
     if (status === 'MATCHED') nextSt = 'PICKUP';
     else if (status === 'PICKUP') nextSt = 'IN_TRANSIT';
-    else if (status === 'IN_TRANSIT') nextSt = 'DELIVERED';
+    else if (status === 'IN_TRANSIT') nextSt = 'AT_GATE';
+    else if (status === 'AT_GATE') nextSt = 'DELIVERED';
     else if (status === 'DELIVERED') nextSt = 'PROCESSING';
     else if (status === 'PROCESSING') nextSt = 'COMPLETED';
 
@@ -160,10 +161,11 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
                 >
                   <span>
                     {status === 'MATCHED' && 'Start Pickup Dispatch →'}
-                    {status === 'PICKUP' && 'Mark Picked Up & En-Route →'}
-                    {status === 'IN_TRANSIT' && 'Mark Delivered at Facility →'}
-                    {status === 'DELIVERED' && 'Start Processing →'}
-                    {status === 'PROCESSING' && 'Mark Conversion Completed →'}
+                    {status === 'PICKUP' && 'Mark Picked Up & In-Transit →'}
+                    {status === 'IN_TRANSIT' && 'Mark Truck Arrived at Facility Gate →'}
+                    {status === 'AT_GATE' && 'Complete Weighbridge Check-In & Intake →'}
+                    {status === 'DELIVERED' && 'Load Feedstock into Conversion Reactor →'}
+                    {status === 'PROCESSING' && 'Mark Conversion Completed & Issue Certificate →'}
                   </span>
                 </button>
               ) : (

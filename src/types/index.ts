@@ -14,9 +14,12 @@ export type PathwayType =
 export type WasteStatus = 
   | 'LISTED'
   | 'ANALYZED'
+  | 'MATCH_REQUESTED'
   | 'MATCHED'
+  | 'REJECTED'
   | 'PICKUP'
   | 'IN_TRANSIT'
+  | 'AT_GATE'
   | 'DELIVERED'
   | 'PROCESSING'
   | 'COMPLETED';
@@ -135,6 +138,10 @@ export interface WasteLot {
   fingerprint: WasteFingerprint;
   status: WasteStatus;
   selectedPathway?: PathwayType;
+  requestedFacilityId?: string;
+  requestedFacilityName?: string;
+  rejectionReason?: string;
+  gateArrivalTime?: string;
   matchedFacilityId?: string;
   matchedFacilityName?: string;
   matchedFacilityType?: PathwayType;
@@ -143,6 +150,22 @@ export interface WasteLot {
   logistics?: LogisticsInfo;
   impactMetrics?: ImpactMetrics;
   processingYield?: ProcessingYield;
+}
+
+export interface NotificationItem {
+  id: string;
+  recipientRole?: 'ALL' | 'WASTE_GENERATOR' | 'FACILITY_OPERATOR';
+  recipientEmail?: string;
+  facilityId?: string;
+  lotId?: string;
+  lotDisplayId?: string;
+  title: string;
+  message: string;
+  type: 'INTAKE_REQUEST' | 'REQUEST_ACCEPTED' | 'REQUEST_REJECTED' | 'GATE_ARRIVAL' | 'STATUS_CHANGE' | 'SYSTEM';
+  read: boolean;
+  actionTab?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
 }
 
 export interface EmissionFactors {

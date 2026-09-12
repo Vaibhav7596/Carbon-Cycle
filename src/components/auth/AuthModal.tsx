@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Lock, Mail, User as UserIcon, Building2, Factory, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Lock, Mail, User as UserIcon, Building2, Factory, Trash2, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const AuthModal: React.FC = () => {
@@ -7,7 +7,7 @@ export const AuthModal: React.FC = () => {
 
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
-  // Form Fields
+  // Form Fields - explicitly reset whenever modal opens
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -18,6 +18,19 @@ export const AuthModal: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Always force blank inputs when modal opens so user must enter login ID and password
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      setEmail('');
+      setPassword('');
+      setName('');
+      setOrganizationName('');
+      setError(null);
+      setSubmitting(false);
+      setMode('LOGIN');
+    }
+  }, [isAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
 
@@ -199,6 +212,37 @@ export const AuthModal: React.FC = () => {
             </>
           )}
 
+          {mode === 'LOGIN' && (
+            <div className="bg-surface-muted/60 p-2.5 rounded-btn border border-border space-y-1.5">
+              <span className="text-[10px] font-bold text-carbon-secondary uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-brand-primary" />
+                <span>Quick Fill Test Credentials:</span>
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('generator@carboncycle.io');
+                    setPassword('Password123!');
+                  }}
+                  className="px-2 py-1 rounded text-[10px] font-bold bg-surface hover:bg-brand-soft border border-border text-carbon-primary transition"
+                >
+                  🌾 Generator (generator@carboncycle.io)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('facility@carboncycle.io');
+                    setPassword('Password123!');
+                  }}
+                  className="px-2 py-1 rounded text-[10px] font-bold bg-surface hover:bg-brand-soft border border-border text-carbon-primary transition"
+                >
+                  🏭 Facility Operator (facility@carboncycle.io)
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block font-semibold text-carbon-primary mb-1">Email Address</label>
             <div className="relative">
@@ -206,6 +250,7 @@ export const AuthModal: React.FC = () => {
               <input
                 type="email"
                 required
+                autoComplete="off"
                 placeholder="name@organization.com"
                 value={email}
                 onChange={(e) => handleEmailChange(e.target.value)}
@@ -222,6 +267,7 @@ export const AuthModal: React.FC = () => {
                 type="password"
                 required
                 minLength={6}
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

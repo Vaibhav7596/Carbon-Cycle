@@ -1,17 +1,27 @@
 import React, { useState } from 'react';
-import { FacilityMatchResult } from '../../types';
-import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Gauge, Leaf, IndianRupee, Award, ArrowRight } from 'lucide-react';
+import { FacilityMatchResult, WasteStatus } from '../../types';
+import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Gauge, Leaf, IndianRupee, Award, ArrowRight, Clock, AlertTriangle, Send } from 'lucide-react';
 
 interface ExplainableMatchCardProps {
   match: FacilityMatchResult;
   isTopMatch?: boolean;
   onSelectFacility: (facilityId: string) => void;
+  lotStatus?: WasteStatus;
+  isRequested?: boolean;
+  isMatched?: boolean;
+  isRejected?: boolean;
+  rejectionReason?: string;
 }
 
 export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
   match,
   isTopMatch = false,
   onSelectFacility,
+  lotStatus,
+  isRequested = false,
+  isMatched = false,
+  isRejected = false,
+  rejectionReason,
 }) => {
   const [showExplanation, setShowExplanation] = useState(isTopMatch);
 
@@ -165,17 +175,30 @@ export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
 
         {/* Select Action CTA */}
         <div className="pt-2">
-          <button
-            onClick={() => onSelectFacility(facility.id)}
-            className={`w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 transition ${
-              isTopMatch
-                ? 'bg-brand-primary text-white hover:bg-brand-dark shadow-sm'
-                : 'bg-carbon-primary text-white hover:bg-black'
-            }`}
-          >
-            <span>Confirm & Select Facility</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {isMatched ? (
+            <div className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Intake Accepted & Scheduled</span>
+            </div>
+          ) : isRequested ? (
+            <div className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-amber-500 text-white shadow-sm animate-pulse">
+              <Clock className="w-4 h-4" />
+              <span>Intake Request Pending Facility Operator Review</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => onSelectFacility(facility.id)}
+              className={`w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 transition ${
+                isTopMatch
+                  ? 'bg-brand-primary text-white hover:bg-brand-dark shadow-sm'
+                  : 'bg-carbon-primary text-white hover:bg-black'
+              }`}
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Send Intake Request to Facility</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

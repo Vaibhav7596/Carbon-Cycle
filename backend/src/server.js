@@ -10,6 +10,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const facilityRoutes = require('./routes/facilityRoutes');
 const wasteLotRoutes = require('./routes/wasteLotRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -55,6 +56,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', authRoutes);
 app.use('/api/facilities', facilityRoutes);
 app.use('/api/waste-lots', wasteLotRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root Health Fallback
 app.get('/', (req, res) => {

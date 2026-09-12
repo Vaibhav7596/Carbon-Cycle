@@ -186,33 +186,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Recent Activity Feed (1 col) */}
+        {/* Recent Batch Status Feed (1 col) */}
         <div className="bg-surface border border-border rounded-card p-5 space-y-4 shadow-subtle flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <h2 className="font-bold text-sm text-carbon-primary">Live Activity Stream</h2>
+              <h2 className="font-bold text-sm text-carbon-primary">My Batch Status</h2>
               <span className="w-2 h-2 rounded-full bg-brand-primary animate-ping"></span>
             </div>
 
-            <div className="space-y-3 mt-3 overflow-y-auto max-h-64 pr-1 text-xs">
-              {wasteLots.slice(0, 4).map((lot) => (
-                <div key={lot.id} className="flex items-start gap-2.5 p-2 rounded-btn bg-surface-muted/40 hover:bg-surface-muted/80 transition">
-                  <div className="w-6 h-6 rounded-full bg-brand-soft text-brand-dark flex items-center justify-center flex-shrink-0 mt-0.5 font-bold text-[10px]">
-                    ✓
-                  </div>
-                  <div className="space-y-0.5 truncate">
-                    <p className="font-semibold text-carbon-primary truncate">
-                      {lot.id} · {lot.generatorName}
-                    </p>
-                    <p className="text-[11px] text-carbon-secondary truncate">
-                      {lot.fingerprint.quantityTonnes}t {lot.fingerprint.wasteType} → <span className="font-medium text-brand-dark">{lot.matchedFacilityName || 'Matched'}</span>
-                    </p>
-                    <span className="text-[9px] text-carbon-muted block">
-                      Status: <strong className="text-carbon-primary">{lot.status}</strong>
-                    </span>
-                  </div>
+            <div className="space-y-2 mt-3 overflow-y-auto max-h-64 pr-1 text-xs">
+              {wasteLots.length === 0 ? (
+                <div className="p-4 text-center text-carbon-muted text-[11px] bg-surface-muted/30 rounded-btn border border-dashed border-border">
+                  No waste batches registered yet.<br/>
+                  <span className="text-brand-primary font-semibold">Click "List Waste Batch" to start.</span>
                 </div>
-              ))}
+              ) : wasteLots.slice(0, 5).map((lot) => {
+                const statusColors: Record<string, string> = {
+                  LISTED: 'text-carbon-secondary bg-surface-muted',
+                  ANALYZED: 'text-blue-700 bg-blue-50',
+                  MATCH_REQUESTED: 'text-amber-700 bg-amber-50',
+                  MATCHED: 'text-emerald-700 bg-emerald-50 font-extrabold',
+                  PICKUP: 'text-blue-700 bg-blue-50',
+                  IN_TRANSIT: 'text-blue-800 bg-blue-100 font-extrabold',
+                  AT_GATE: 'text-purple-700 bg-purple-50 animate-pulse',
+                  DELIVERED: 'text-purple-700 bg-purple-50',
+                  PROCESSING: 'text-amber-800 bg-amber-100 font-extrabold',
+                  COMPLETED: 'text-emerald-800 bg-emerald-100 font-extrabold',
+                  REJECTED: 'text-rose-700 bg-rose-50',
+                };
+                const statusLabel: Record<string, string> = {
+                  LISTED: '📋 Listed',
+                  ANALYZED: '🔬 Analyzed',
+                  MATCH_REQUESTED: '⏳ Awaiting Facility',
+                  MATCHED: '✅ Facility Accepted!',
+                  PICKUP: '🚛 Pickup Dispatched',
+                  IN_TRANSIT: '🚛 In Transit',
+                  AT_GATE: '🚪 At Facility Gate',
+                  DELIVERED: '📦 Delivered',
+                  PROCESSING: '⚙️ Processing',
+                  COMPLETED: '🎉 Completed!',
+                  REJECTED: '❌ Rejected',
+                };
+                const isActive = ['MATCHED', 'PICKUP', 'IN_TRANSIT', 'AT_GATE', 'DELIVERED', 'PROCESSING'].includes(lot.status);
+                return (
+                  <div
+                    key={lot.id}
+                    className="flex items-start gap-2.5 p-2.5 rounded-btn bg-surface-muted/40 hover:bg-surface-muted/80 transition cursor-pointer border border-transparent hover:border-border"
+                    onClick={() => onSelectLot(lot.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-carbon-primary truncate">{lot.id}</p>
+                      <p className="text-[10px] text-carbon-secondary truncate">{lot.fingerprint.quantityTonnes}t {lot.fingerprint.wasteType}</p>
+                      {lot.matchedFacilityName && (
+                        <p className="text-[10px] text-brand-dark truncate">→ {lot.matchedFacilityName}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[lot.status] || 'text-carbon-secondary bg-surface-muted'}`}>
+                        {statusLabel[lot.status] || lot.status}
+                      </span>
+                      {isActive && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSelectLot(lot.id); onSelectTab('LOGISTICS'); }}
+                          className="text-[9px] font-bold text-blue-700 hover:text-blue-900 underline"
+                        >
+                          Track →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

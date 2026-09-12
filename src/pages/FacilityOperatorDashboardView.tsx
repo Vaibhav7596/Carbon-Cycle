@@ -24,7 +24,10 @@ import {
   Play,
   Settings,
   ArrowUpRight,
-  Filter
+  Filter,
+  X,
+  Send,
+  AlertTriangle
 } from 'lucide-react';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 
@@ -34,6 +37,8 @@ interface FacilityOperatorDashboardViewProps {
   onSelectTab: (tab: NavTab) => void;
   onSelectLot: (lotId: string) => void;
   onUpdateLotStatus: (lotId: string, newStatus: WasteStatus) => void;
+  onRespondToMatchRequest?: (lotId: string, action: 'ACCEPT' | 'REJECT', rejectionReason?: string, facilityId?: string) => Promise<void>;
+  onNotifyGateArrival?: (lotId: string) => Promise<void>;
   onOpenReport: (lot: WasteLot) => void;
 }
 
@@ -43,16 +48,20 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
   onSelectTab,
   onSelectLot,
   onUpdateLotStatus,
+  onRespondToMatchRequest,
+  onNotifyGateArrival,
   onOpenReport,
 }) => {
   const { user } = useAuth();
 
   // Find the logged-in operator's facility
-  const myFacility = facilities.find(
-    (f) =>
-      (user?.organizationName && f.name.toLowerCase().includes(user.organizationName.toLowerCase())) ||
-      f.name.toLowerCase().includes('ecochar')
-  ) || facilities[0];
+  // Priority: 1) exact email match 2) org name match 3) ecochar fallback 4) first facility
+  const myFacility = (
+    facilities.find((f) => user?.email && f.contactEmail?.toLowerCase() === user.email.toLowerCase()) ||
+    facilities.find((f) => user?.organizationName && f.name.toLowerCase().includes(user.organizationName.toLowerCase().split(' ')[0])) ||
+    facilities.find((f) => f.name.toLowerCase().includes('ecochar')) ||
+    facilities[0]
+  );
 
   // Local interactive states for facility operator controls
   const [operationalStatus, setOperationalStatus] = useState<'ACTIVE' | 'FULL' | 'MAINTENANCE'>(
@@ -60,31 +69,64 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
   );
   const [dailyCapacity, setDailyCapacity] = useState<number>(myFacility?.maxCapacityTonnes || 50.0);
   const [isEditingCapacity, setIsEditingCapacity] = useState<boolean>(false);
-  const [inboundFilter, setInboundFilter] = useState<'ALL' | 'IN_TRANSIT' | 'DELIVERED' | 'PROCESSING'>('ALL');
+  const [inboundFilter, setInboundFilter] = useState<'ALL' | 'AVAILABLE' | 'IN_TRANSIT' | 'DELIVERED' | 'PROCESSING'>('ALL');
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  // Rejection modal state
+  const [rejectingLot, setRejectingLot] = useState<WasteLot | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>('Exceeds maximum allowable moisture content (>25%)');
+  const [customReason, setCustomReason] = useState<string>('');
 
   // Accepted waste types local toggle
   const [acceptedTypes, setAcceptedTypes] = useState<WasteType[]>(
     myFacility?.acceptedWasteTypes || ['AGRICULTURAL_RESIDUE', 'BIOMASS_WOOD']
   );
 
-  // Filter lots related to this facility (or matching its technology/type)
-  const facilityLots = wasteLots.filter(
-    (l) =>
-      l.matchedFacilityId === myFacility.id ||
-      l.matchedFacilityName?.toLowerCase().includes('ecochar') ||
-      l.selectedPathway === myFacility.type ||
-      l.fingerprint.wasteType === 'AGRICULTURAL_RESIDUE'
-  );
+  const myFacilityType = myFacility?.type;
+  const myAcceptedWasteTypes = myFacility?.acceptedWasteTypes || [];
 
-  const deliveredLots = facilityLots.filter((l) => l.status === 'DELIVERED');
+  // Pending intake requests: MATCH_REQUESTED sent to THIS facility + all LISTED/ANALYZED open batches
+  const pendingRequests = wasteLots.filter((l) => {
+    if (l.status === 'MATCH_REQUESTED') {
+      return (
+        l.requestedFacilityId === myFacility?.id ||
+        l.requestedFacilityName === myFacility?.name ||
+        (myFacilityType && l.selectedPathway === myFacilityType)
+      );
+    }
+    // Surface open batches this facility can intake (matching waste type)
+    if (l.status === 'LISTED' || l.status === 'ANALYZED') {
+      return myAcceptedWasteTypes.length === 0 ||
+        myAcceptedWasteTypes.includes(l.fingerprint.wasteType);
+    }
+    return false;
+  });
+
+  // All lots relevant to THIS facility (matched to it, requested to it, or open and compatible)
+  const facilityLots = wasteLots.filter((l) => {
+    // Lots explicitly matched or assigned to this facility
+    if (l.matchedFacilityId === myFacility?.id) return true;
+    if (l.matchedFacilityName === myFacility?.name) return true;
+    if (l.requestedFacilityId === myFacility?.id) return true;
+    if (l.requestedFacilityName === myFacility?.name) return true;
+    // Open available batches compatible with this facility
+    if ((l.status === 'LISTED' || l.status === 'ANALYZED') &&
+        (myAcceptedWasteTypes.length === 0 || myAcceptedWasteTypes.includes(l.fingerprint.wasteType))) return true;
+    // Match-requested lots matching this facility's processing type
+    if (l.status === 'MATCH_REQUESTED' && myFacilityType && l.selectedPathway === myFacilityType) return true;
+    return false;
+  });
+
+  const deliveredLots = facilityLots.filter((l) => l.status === 'DELIVERED' || l.status === 'AT_GATE');
   const processingLots = facilityLots.filter((l) => l.status === 'PROCESSING');
   const completedLots = facilityLots.filter((l) => l.status === 'COMPLETED');
-  const inTransitLots = facilityLots.filter((l) => l.status === 'IN_TRANSIT' || l.status === 'PICKUP' || l.status === 'MATCHED');
+  const inTransitLots = facilityLots.filter((l) => l.status === 'IN_TRANSIT' || l.status === 'PICKUP' || l.status === 'MATCHED' || l.status === 'AT_GATE');
+  const availableLots = facilityLots.filter((l) => l.status === 'LISTED' || l.status === 'ANALYZED' || l.status === 'MATCH_REQUESTED');
 
   // Filtered list based on selected filter tab
   const displayedLots = facilityLots.filter((lot) => {
     if (inboundFilter === 'ALL') return true;
+    if (inboundFilter === 'AVAILABLE') return lot.status === 'LISTED' || lot.status === 'ANALYZED' || lot.status === 'MATCH_REQUESTED';
     if (inboundFilter === 'IN_TRANSIT') return lot.status === 'IN_TRANSIT' || lot.status === 'PICKUP' || lot.status === 'MATCHED';
     if (inboundFilter === 'DELIVERED') return lot.status === 'DELIVERED';
     if (inboundFilter === 'PROCESSING') return lot.status === 'PROCESSING';
@@ -124,6 +166,45 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
       setAcceptedTypes([...acceptedTypes, type]);
       triggerToast(`Added ${WASTE_TYPE_LABELS[type]?.label || type} to accepted intake`);
     }
+  };
+
+  const handleAcceptIntake = async (lot: WasteLot) => {
+    const targetFacId = myFacility?.id || 'FAC-ECOCHAR-01';
+    if (onRespondToMatchRequest) {
+      await onRespondToMatchRequest(lot.id, 'ACCEPT', undefined, targetFacId);
+    } else {
+      const { respondToMatchRequestApi } = await import('../services/store');
+      await respondToMatchRequestApi(lot.id, 'ACCEPT', undefined, targetFacId);
+      onUpdateLotStatus(lot.id, 'MATCHED');
+    }
+    triggerToast(`Intake request ACCEPTED for ${lot.id}. Collection scheduled & generator notified.`);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectingLot) return;
+    const finalReason = selectedReason === 'Other' && customReason.trim() ? customReason.trim() : selectedReason;
+    const targetFacId = myFacility?.id || 'FAC-ECOCHAR-01';
+    if (onRespondToMatchRequest) {
+      await onRespondToMatchRequest(rejectingLot.id, 'REJECT', finalReason, targetFacId);
+    } else {
+      const { respondToMatchRequestApi } = await import('../services/store');
+      await respondToMatchRequestApi(rejectingLot.id, 'REJECT', finalReason, targetFacId);
+      onUpdateLotStatus(rejectingLot.id, 'REJECTED');
+    }
+    triggerToast(`Intake request REJECTED for ${rejectingLot.id}. Generator notified.`);
+    setRejectingLot(null);
+    setCustomReason('');
+  };
+
+  const handleGateArrival = async (lotId: string) => {
+    if (onNotifyGateArrival) {
+      await onNotifyGateArrival(lotId);
+    } else {
+      const { notifyGateArrivalApi } = await import('../services/store');
+      await notifyGateArrivalApi(lotId);
+      onUpdateLotStatus(lotId, 'AT_GATE');
+    }
+    triggerToast(`Truck arrived at facility gate! Live alert sent to generator & plant team.`);
   };
 
   return (
@@ -236,6 +317,128 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
           </div>
         </div>
       </div>
+
+      {/* Pending Intake Requests Alert (Awaiting Facility Operator Decision) */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-card p-5 space-y-4 shadow-subtle animate-fadeIn">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-btn bg-amber-500 text-white shadow-sm animate-pulse">
+                <AlertCircle className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-black text-carbon-primary flex items-center gap-2">
+                  <span>Inbound Waste Intake & Available Feedstock Batches</span>
+                  <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {pendingRequests.length} Ready for Intake
+                  </span>
+                </h2>
+                <p className="text-xs text-carbon-secondary">
+                  Review feedstock specifications, claimed requests, and open batches. Choose to Accept Intake or Reject.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-mono font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded border border-amber-300">
+              MongoDB Live Pipeline
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingRequests.map((lot) => {
+              const wasteMeta = WASTE_TYPE_LABELS[lot.fingerprint.wasteType] || { label: lot.fingerprint.wasteType };
+              const isMoistureHigh = lot.fingerprint.moisturePercent > 25;
+              const isContamHigh = lot.fingerprint.contaminationPercent > 5;
+              const isDirectRequest = lot.status === 'MATCH_REQUESTED';
+
+              return (
+                <div
+                  key={lot.id}
+                  className={`bg-surface border rounded-btn p-4 shadow-sm space-y-3 ${
+                    isDirectRequest ? 'border-amber-400 bg-amber-50/20' : 'border-emerald-300 bg-emerald-50/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-carbon-primary">{lot.id}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-soft text-brand-dark uppercase">
+                          {wasteMeta.label}
+                        </span>
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${
+                          isDirectRequest
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        }`}>
+                          {isDirectRequest ? '⚡ Intake Requested' : '🌱 Available Batch'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-carbon-secondary mt-0.5">
+                        Generator: <span className="font-semibold text-carbon-primary">{lot.generatorName}</span> ({lot.generatorType})
+                      </p>
+                      <p className="text-[11px] text-carbon-muted">
+                        Origin: {lot.fingerprint.location.address}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-base font-black text-brand-primary">
+                        {lot.fingerprint.quantityTonnes} t
+                      </span>
+                      <span className="text-[10px] text-carbon-muted block">Biomass Volume</span>
+                    </div>
+                  </div>
+
+                  {/* Fingerprint Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-surface-muted/60 p-2.5 rounded text-xs border border-border">
+                    <div>
+                      <span className="text-[10px] text-carbon-muted block">Moisture</span>
+                      <span className={`font-bold ${isMoistureHigh ? 'text-amber-700 font-black' : 'text-emerald-700'}`}>
+                        {lot.fingerprint.moisturePercent}% {isMoistureHigh ? '⚠ High' : '✓ Good'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-carbon-muted block">Impurities</span>
+                      <span className={`font-bold ${isContamHigh ? 'text-rose-700 font-black' : 'text-emerald-700'}`}>
+                        {lot.fingerprint.contaminationPercent}% {isContamHigh ? '⚠ Impure' : '✓ Clean'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-carbon-muted block">Window</span>
+                      <span className="font-semibold text-carbon-primary truncate block">
+                        {lot.fingerprint.availabilityWindow}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Accept / Reject Buttons */}
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/60">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRejectingLot(lot);
+                        setSelectedReason('Exceeds maximum allowable moisture content (>25%)');
+                      }}
+                      className="px-3 py-1.5 rounded-btn text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-300 transition flex items-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Reject Request</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAcceptIntake(lot)}
+                      className="px-4 py-1.5 rounded-btn text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Accept Intake</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 4 Core Operator Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -425,6 +628,14 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
                 All ({facilityLots.length})
               </button>
               <button
+                onClick={() => setInboundFilter('AVAILABLE')}
+                className={`px-2.5 py-1 rounded font-bold text-[11px] transition ${
+                  inboundFilter === 'AVAILABLE' ? 'bg-surface text-emerald-700 shadow-xs' : 'text-carbon-secondary hover:text-carbon-primary'
+                }`}
+              >
+                Available ({availableLots.length})
+              </button>
+              <button
                 onClick={() => setInboundFilter('IN_TRANSIT')}
                 className={`px-2.5 py-1 rounded font-bold text-[11px] transition ${
                   inboundFilter === 'IN_TRANSIT' ? 'bg-surface text-blue-600 shadow-xs' : 'text-carbon-secondary hover:text-carbon-primary'
@@ -473,16 +684,20 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-soft text-brand-dark uppercase">
                           {WASTE_TYPE_LABELS[lot.fingerprint.wasteType]?.label || lot.fingerprint.wasteType}
                         </span>
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                          lot.status === 'COMPLETED'
-                            ? 'bg-emerald-100 text-emerald-800'
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${
+                          lot.status === 'AT_GATE'
+                            ? 'bg-blue-100 text-blue-900 border-blue-300 animate-pulse'
+                            : lot.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                             : lot.status === 'PROCESSING'
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
                             : lot.status === 'DELIVERED'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-surface-muted text-carbon-secondary'
+                            ? 'bg-purple-100 text-purple-800 border-purple-300'
+                            : lot.status === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-surface-muted text-carbon-secondary border-border'
                         }`}>
-                          {lot.status}
+                          {lot.status === 'AT_GATE' ? 'WAITING AT GATE' : lot.status}
                         </span>
                       </div>
 
@@ -518,25 +733,136 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
                       </div>
                     </div>
 
+                    {/* Interactive Lifecycle Progress Stepper */}
+                    <div className="bg-surface-muted/40 border border-border/70 rounded-btn p-2 text-[10px] space-y-1">
+                      <div className="flex items-center justify-between text-carbon-secondary text-[10px] font-semibold">
+                        <span>Intake-to-Carbon Stage:</span>
+                        <span className="font-extrabold text-brand-dark">
+                          {lot.status === 'MATCH_REQUESTED' && '⏳ Awaiting Facility Acceptance'}
+                          {(lot.status === 'LISTED' || lot.status === 'ANALYZED') && '🌱 Available Feedstock Batch'}
+                          {lot.status === 'MATCHED' && 'Step 1/5: Accepted – Ready to Dispatch Vehicle'}
+                          {lot.status === 'PICKUP' && 'Step 1/5: Vehicle Dispatched for Pickup'}
+                          {lot.status === 'IN_TRANSIT' && 'Step 2/5: Waste In Transit to Facility'}
+                          {lot.status === 'AT_GATE' && 'Step 3/5: Arrived at Gate – Awaiting Weighbridge'}
+                          {lot.status === 'DELIVERED' && 'Step 3/5: Weighed & Admitted to Feedstock Yard'}
+                          {lot.status === 'PROCESSING' && 'Step 4/5: Active in Conversion Reactor'}
+                          {lot.status === 'COMPLETED' && 'Step 5/5: Conversion Complete & MRV Certified'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 pt-1">
+                        {[
+                          { step: 1, label: 'Accepted', done: ['MATCHED', 'PICKUP', 'IN_TRANSIT', 'AT_GATE', 'DELIVERED', 'PROCESSING', 'COMPLETED'].includes(lot.status), current: lot.status === 'MATCHED' || lot.status === 'PICKUP' },
+                          { step: 2, label: 'Transit', done: ['IN_TRANSIT', 'AT_GATE', 'DELIVERED', 'PROCESSING', 'COMPLETED'].includes(lot.status), current: lot.status === 'IN_TRANSIT' },
+                          { step: 3, label: 'At Gate', done: ['AT_GATE', 'DELIVERED', 'PROCESSING', 'COMPLETED'].includes(lot.status), current: lot.status === 'AT_GATE' || lot.status === 'DELIVERED' },
+                          { step: 4, label: 'Reactor', done: ['PROCESSING', 'COMPLETED'].includes(lot.status), current: lot.status === 'PROCESSING' },
+                          { step: 5, label: 'Certified', done: lot.status === 'COMPLETED', current: lot.status === 'COMPLETED' },
+                        ].map((s) => (
+                          <div
+                            key={s.step}
+                            className={`text-center py-1 px-0.5 rounded font-bold text-[9px] truncate transition ${
+                              s.current
+                                ? 'bg-amber-100 text-amber-900 border border-amber-400 shadow-xs animate-pulse'
+                                : s.done
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-surface text-carbon-muted border border-border/50'
+                            }`}
+                          >
+                            {s.done && !s.current ? '✓ ' : ''}{s.step}. {s.label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Operator Workflow Action Buttons */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       <div className="text-[11px] text-carbon-muted flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>Pickup/Intake window: {lot.fingerprint.availabilityWindow}</span>
+                        <span>Window: {lot.fingerprint.availabilityWindow}</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {(lot.status === 'LISTED' || lot.status === 'ANALYZED' || lot.status === 'MATCH_REQUESTED') && (
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptIntake(lot)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-btn flex items-center gap-1 transition shadow-xs"
+                            title="Accept this waste batch for facility intake"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Accept Intake Request</span>
+                          </button>
+                        )}
+
+                        {lot.status === 'MATCHED' && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onUpdateLotStatus(lot.id, 'IN_TRANSIT');
+                                triggerToast(`Vehicle dispatched! Batch ${lot.id} is now In-Transit.`);
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-btn flex items-center gap-1.5 transition shadow-xs"
+                              title="Dispatch pickup truck to collect batch and start transit"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>Dispatch Truck & Start Transit →</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { onSelectLot(lot.id); onSelectTab('LOGISTICS'); }}
+                              className="bg-surface hover:bg-surface-muted text-carbon-primary border border-border font-semibold text-xs px-2.5 py-1.5 rounded-btn transition"
+                            >
+                              <span>Route GIS →</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {lot.status === 'PICKUP' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onUpdateLotStatus(lot.id, 'IN_TRANSIT');
+                              triggerToast(`Batch ${lot.id} picked up and now in transit.`);
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-btn flex items-center gap-1 transition shadow-xs"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>Confirm Loaded & In-Transit →</span>
+                          </button>
+                        )}
+
                         {lot.status === 'IN_TRANSIT' && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleGateArrival(lot.id)}
+                              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-btn flex items-center gap-1.5 transition shadow-xs"
+                              title="Log truck arrival at facility entrance"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>Notify Gate Arrival (Weighbridge Ready) →</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { onSelectLot(lot.id); onSelectTab('LOGISTICS'); }}
+                              className="bg-surface hover:bg-surface-muted text-carbon-primary border border-border font-semibold text-xs px-2.5 py-1.5 rounded-btn transition"
+                            >
+                              <span>Route GIS →</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {lot.status === 'AT_GATE' && (
                           <button
                             type="button"
                             onClick={() => {
                               onUpdateLotStatus(lot.id, 'DELIVERED');
-                              triggerToast(`Batch ${lot.id} logged as DELIVERED at facility gate.`);
+                              triggerToast(`Batch ${lot.id} weighbridge verified & admitted to intake.`);
                             }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-btn flex items-center gap-1 transition shadow-xs"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-btn flex items-center gap-1.5 transition shadow-xs animate-pulse"
                           >
                             <Scale className="w-3.5 h-3.5" />
-                            <span>Log Gate Arrival & Weigh-in</span>
+                            <span>Weighbridge Check-In & Complete Intake →</span>
                           </button>
                         )}
 
@@ -545,12 +871,12 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
                             type="button"
                             onClick={() => {
                               onUpdateLotStatus(lot.id, 'PROCESSING');
-                              triggerToast(`Batch ${lot.id} loaded into Pyrolysis Reactor.`);
+                              triggerToast(`Batch ${lot.id} loaded into ${myFacility.type || 'Conversion'} Reactor hoppers.`);
                             }}
-                            className="bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs px-3 py-1.5 rounded-btn flex items-center gap-1 transition shadow-xs"
+                            className="bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs px-3.5 py-1.5 rounded-btn flex items-center gap-1.5 transition shadow-xs"
                           >
                             <Flame className="w-3.5 h-3.5" />
-                            <span>Load into Pyrolysis Reactor</span>
+                            <span>Load into {myFacility.type || 'Conversion'} Reactor →</span>
                           </button>
                         )}
 
@@ -561,10 +887,10 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
                               onUpdateLotStatus(lot.id, 'COMPLETED');
                               triggerToast(`Batch ${lot.id} conversion completed! Carbon impact recorded.`);
                             }}
-                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-1.5 rounded-btn flex items-center gap-1 transition shadow-xs"
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-btn flex items-center gap-1.5 transition shadow-xs"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Complete & Certify Yield</span>
+                            <span>Complete Conversion & Issue Certificate →</span>
                           </button>
                         )}
 
@@ -708,6 +1034,95 @@ export const FacilityOperatorDashboardView: React.FC<FacilityOperatorDashboardVi
         </div>
 
       </div>
+
+      {/* Rejection Modal Dialog */}
+      {rejectingLot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-surface border border-border rounded-card max-w-md w-full p-5 space-y-4 shadow-modal text-xs">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <h3 className="font-extrabold text-sm text-carbon-primary">
+                  Decline Waste Batch Intake ({rejectingLot.id})
+                </h3>
+              </div>
+              <button
+                onClick={() => setRejectingLot(null)}
+                className="text-carbon-muted hover:text-carbon-primary p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-carbon-secondary leading-relaxed">
+              Please specify the reason for declining this intake request from <span className="font-semibold text-carbon-primary">{rejectingLot.generatorName}</span>. The generator will receive a live notification in MongoDB and will be provided alternative facilities.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-carbon-secondary block">
+                Primary Reason:
+              </label>
+              {[
+                'Exceeds maximum allowable moisture content (>25%)',
+                'Feedstock impurities / contamination exceeds limits (>5%)',
+                'Rotary kiln lines currently at 100% daily capacity',
+                'Pickup window conflicts with planned plant maintenance',
+                'Other',
+              ].map((reason) => (
+                <label
+                  key={reason}
+                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition ${
+                    selectedReason === reason
+                      ? 'bg-rose-50 border-rose-300 text-rose-900 font-semibold'
+                      : 'bg-surface border-border text-carbon-secondary hover:bg-surface-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="rejectReason"
+                    value={reason}
+                    checked={selectedReason === reason}
+                    onChange={(e) => setSelectedReason(e.target.value)}
+                    className="text-rose-600 focus:ring-rose-500"
+                  />
+                  <span>{reason}</span>
+                </label>
+              ))}
+
+              {selectedReason === 'Other' && (
+                <div className="pt-2">
+                  <textarea
+                    rows={2}
+                    placeholder="Enter custom rejection reason..."
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    className="w-full p-2 border border-border rounded text-xs focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setRejectingLot(null)}
+                className="px-3 py-1.5 border border-border rounded-btn text-carbon-secondary font-semibold hover:bg-surface-muted"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-btn shadow-sm transition flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Confirm & Send Rejection</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

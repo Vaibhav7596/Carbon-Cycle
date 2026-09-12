@@ -42,9 +42,12 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
     const styles: Record<string, string> = {
       LISTED: 'bg-surface-muted text-carbon-secondary border-border',
       ANALYZED: 'bg-blue-50 text-blue-700 border-blue-200',
-      MATCHED: 'bg-brand-soft text-brand-dark border-brand-primary/30',
+      MATCH_REQUESTED: 'bg-amber-50 text-amber-800 border-amber-300 font-bold',
+      MATCHED: 'bg-brand-soft text-brand-dark border-brand-primary/30 font-bold',
+      REJECTED: 'bg-rose-100 text-rose-800 border-rose-300 font-bold',
       PICKUP: 'bg-amber-50 text-amber-700 border-amber-200',
       IN_TRANSIT: 'bg-blue-50 text-blue-700 border-blue-200',
+      AT_GATE: 'bg-blue-100 text-blue-800 border-blue-300 font-bold animate-pulse',
       DELIVERED: 'bg-purple-50 text-purple-700 border-purple-200',
       PROCESSING: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold',
@@ -108,8 +111,14 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           >
             <option value="ALL">All Statuses</option>
             <option value="LISTED">LISTED</option>
+            <option value="ANALYZED">ANALYZED</option>
+            <option value="MATCH_REQUESTED">MATCH_REQUESTED</option>
             <option value="MATCHED">MATCHED</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="PICKUP">PICKUP</option>
             <option value="IN_TRANSIT">IN_TRANSIT</option>
+            <option value="AT_GATE">AT_GATE</option>
+            <option value="DELIVERED">DELIVERED</option>
             <option value="PROCESSING">PROCESSING</option>
             <option value="COMPLETED">COMPLETED</option>
           </select>
@@ -152,6 +161,8 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                     <td className="p-3.5 text-carbon-secondary">
                       {lot.matchedFacilityName ? (
                         <span className="font-semibold text-brand-dark">{lot.matchedFacilityName}</span>
+                      ) : lot.requestedFacilityName ? (
+                        <span className="text-amber-700 font-medium">Pending: {lot.requestedFacilityName}</span>
                       ) : (
                         <span className="text-carbon-muted italic">Unmatched</span>
                       )}
@@ -161,17 +172,32 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                     </td>
                     <td className="p-3.5">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] border ${getStatusBadge(lot.status)}`}>
-                        {lot.status}
+                        {lot.status === 'MATCH_REQUESTED'
+                          ? 'REQUESTED'
+                          : lot.status === 'AT_GATE'
+                          ? 'AT GATE'
+                          : lot.status}
                       </span>
                     </td>
                     <td className="p-3.5 text-right space-x-2">
-                      <button
-                        onClick={() => onSelectLot(lot.id)}
-                        className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-dark font-semibold px-2 py-1 bg-brand-soft rounded"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Inspect</span>
-                      </button>
+                      {lot.status === 'REJECTED' ? (
+                        <button
+                          onClick={() => onSelectLot(lot.id)}
+                          className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold px-2 py-1 bg-rose-50 border border-rose-200 rounded"
+                          title="Select an alternative facility"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Select Alternative</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onSelectLot(lot.id)}
+                          className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-dark font-semibold px-2 py-1 bg-brand-soft rounded"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Inspect</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => onOpenReport(lot)}
