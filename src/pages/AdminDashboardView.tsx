@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Facility, WasteLot } from '../types';
-import { AuthUser } from '../services/authService';
+import { AuthUser, API_BASE_URL } from '../services/authService';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { ShieldCheck, Users, Factory, Trash2, Leaf, Settings, CheckCircle2, ChevronRight, BarChart3, Database, Key } from 'lucide-react';
 import { DEFAULT_EMISSION_FACTORS } from '../data/constants';
@@ -20,7 +20,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ wasteLot
     async function fetchUsers() {
       try {
         const token = localStorage.getItem('carboncycle_auth_token_v1');
-        const res = await fetch('http://localhost:5000/api/admin/users', {
+        const res = await fetch(`${API_BASE_URL}/admin/users`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

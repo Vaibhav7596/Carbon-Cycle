@@ -14,18 +14,31 @@ const app = express();
 
 // Enable CORS for React frontend
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:3000',
+  'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:3000',
 ];
 
+if (process.env.CLIENT_URL) {
+  process.env.CLIENT_URL.split(',').forEach((url) => {
+    const cleaned = url.trim().replace(/\/+$/, '');
+    if (cleaned) allowedOrigins.push(cleaned);
+  });
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      if (!origin) return callback(null, true);
+      const cleanedOrigin = origin.replace(/\/+$/, '');
+      if (
+        allowedOrigins.includes(cleanedOrigin) ||
+        cleanedOrigin.endsWith('.onrender.com') ||
+        process.env.NODE_ENV !== 'production'
+      ) {
         callback(null, true);
       } else {
-        callback(null, true); // Allow during dev
+        callback(null, true);
       }
     },
     credentials: true,
