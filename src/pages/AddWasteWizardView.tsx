@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 import { LocationPoint, WasteFingerprint, WasteType } from '../types';
 import { createWasteLotApi } from '../services/store';
 import { useAuth } from '../context/AuthContext';
 import { NavTab } from '../components/layout/Sidebar';
-import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Loader2, Lock, Edit3 } from 'lucide-react';
+import { Trash2, Scale, MapPin, Calendar, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Loader2, Lock, Edit3, X } from 'lucide-react';
 
 interface AddWasteWizardViewProps {
   onCreatedLot: (lotId: string) => void;
@@ -179,22 +179,60 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
     }
   };
 
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside the wizard card or pressing Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        onCancel();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onCancel]);
+
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <div>
-          <h1 className="text-xl font-extrabold text-carbon-primary">Register New Waste Batch</h1>
-          <p className="text-xs text-carbon-secondary">Progressive waste fingerprint creation & decision engine intake.</p>
+    <div 
+      className="min-h-full w-full py-6 px-4 sm:px-6 flex justify-center items-start cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <div 
+        ref={cardRef}
+        className="max-w-3xl w-full space-y-6 cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <div>
+            <h1 className="text-xl font-extrabold text-carbon-primary">Register New Waste Batch</h1>
+            <p className="text-xs text-carbon-secondary">Progressive waste fingerprint creation & decision engine intake.</p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-carbon-secondary hover:text-carbon-primary shadow-xs transition"
+            title="Close (or click outside)"
+          >
+            <span>Cancel</span>
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button
-          onClick={onCancel}
-          className="text-xs text-carbon-secondary hover:text-carbon-primary font-semibold"
-        >
-          Cancel
-        </button>
-      </div>
 
       {/* Stepper Bar */}
       <div className="flex items-center justify-between bg-surface border border-border rounded-btn p-3 text-xs">
@@ -727,5 +765,6 @@ export const AddWasteWizardView: React.FC<AddWasteWizardViewProps> = ({ onCreate
 
       </div>
     </div>
-  );
+  </div>
+);
 };

@@ -58,13 +58,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'OVERVIEW',
       items: [
-        { id: 'DASHBOARD', label: 'Overview', icon: LayoutDashboard },
+        { 
+          id: 'DASHBOARD', 
+          label: user?.role === 'facility_operator' ? 'Facility Dashboard' : 'Overview', 
+          icon: user?.role === 'facility_operator' ? Factory : LayoutDashboard,
+          badgeText: user?.role === 'facility_operator' ? 'OPERATOR' : undefined,
+        },
         ...(user?.role === 'admin' ? [{ id: 'ADMIN_DASHBOARD' as NavTab, label: 'Admin Dashboard', icon: ShieldCheck, badgeText: 'ADMIN' }] : []),
       ],
     },
     {
       title: 'OPERATIONS',
-      items: [
+      items: user?.role === 'facility_operator' ? [
+        { id: 'PROCESSING', label: 'Processing Queue', icon: Cpu },
+        { id: 'WASTE', label: 'Inbound Feedstock Lots', icon: Trash2, badge: activeWasteCount },
+        { id: 'LOGISTICS', label: 'Inbound Logistics', icon: Truck },
+        { id: 'FACILITIES', label: 'Network Facilities', icon: Factory },
+      ] : [
         { id: 'WASTE', label: 'Waste Lots', icon: Trash2, badge: activeWasteCount },
         { id: 'FACILITIES', label: 'Facilities', icon: Factory },
         { id: 'LOGISTICS', label: 'Logistics', icon: Truck },

@@ -3,6 +3,7 @@ import { NavTab, Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardView } from './pages/DashboardView';
+import { FacilityOperatorDashboardView } from './pages/FacilityOperatorDashboardView';
 import { AdminDashboardView } from './pages/AdminDashboardView';
 import { AddWasteWizardView } from './pages/AddWasteWizardView';
 import { WasteIntelligenceView } from './pages/WasteIntelligenceView';
@@ -32,6 +33,7 @@ function AppContent() {
   
   // Default to LANDING if unauthenticated, or appropriate dashboard if authenticated
   const [currentTab, setCurrentTab] = useState<NavTab>('LANDING');
+  const [previousTab, setPreviousTab] = useState<NavTab>('DASHBOARD');
 
   const [wasteLots, setWasteLots] = useState<WasteLot[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -80,7 +82,7 @@ function AppContent() {
     } else if (user?.role === 'admin') {
       setCurrentTab('ADMIN_DASHBOARD');
     } else if (user?.role === 'facility_operator') {
-      setCurrentTab('PROCESSING');
+      setCurrentTab('DASHBOARD');
     } else {
       setCurrentTab('DASHBOARD');
     }
@@ -90,6 +92,9 @@ function AppContent() {
     if (tab !== 'LANDING' && !isAuthenticated) {
       setAuthModalOpen(true);
       return;
+    }
+    if (currentTab !== 'ADD_WASTE') {
+      setPreviousTab(currentTab);
     }
     setCurrentTab(tab);
   };
@@ -175,7 +180,6 @@ function AppContent() {
           <Topbar
             currentTab={currentTab}
             onSelectTab={handleNavigate}
-            onResetDemo={handleResetDemo}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             isSidebarCollapsed={isSidebarCollapsed}
@@ -193,16 +197,30 @@ function AppContent() {
           )}
 
           {currentTab === 'DASHBOARD' && (
-            <DashboardView
-              wasteLots={wasteLots}
-              facilities={facilities}
-              onSelectTab={handleNavigate}
-              onSelectLot={(id) => {
-                setSelectedLotId(id);
-                setCurrentTab('LOGISTICS');
-              }}
-              onSelectFacility={() => setCurrentTab('FACILITIES')}
-            />
+            user?.role === 'facility_operator' ? (
+              <FacilityOperatorDashboardView
+                wasteLots={wasteLots}
+                facilities={facilities}
+                onSelectTab={handleNavigate}
+                onSelectLot={(id) => {
+                  setSelectedLotId(id);
+                  setCurrentTab('LOGISTICS');
+                }}
+                onUpdateLotStatus={handleUpdateLotStatus}
+                onOpenReport={(lot) => setOpenReportLot(lot)}
+              />
+            ) : (
+              <DashboardView
+                wasteLots={wasteLots}
+                facilities={facilities}
+                onSelectTab={handleNavigate}
+                onSelectLot={(id) => {
+                  setSelectedLotId(id);
+                  setCurrentTab('LOGISTICS');
+                }}
+                onSelectFacility={() => setCurrentTab('FACILITIES')}
+              />
+            )
           )}
 
           {currentTab === 'WASTE' && (
@@ -221,7 +239,7 @@ function AppContent() {
           {currentTab === 'ADD_WASTE' && (
             <AddWasteWizardView
               onCreatedLot={handleCreatedLot}
-              onCancel={() => setCurrentTab('WASTE')}
+              onCancel={() => setCurrentTab(previousTab || (user?.role === 'facility_operator' ? 'PROCESSING' : 'WASTE'))}
             />
           )}
 
