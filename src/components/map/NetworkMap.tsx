@@ -89,7 +89,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   return (
     <div className="relative w-full rounded-card border border-border overflow-hidden bg-surface shadow-subtle">
       {/* Map Header Overlay Bar */}
-      <div className="absolute top-3 left-3 z-[1000] bg-surface/90 backdrop-blur-md px-3 py-1.5 rounded-btn border border-border shadow-sm flex items-center gap-3 text-xs">
+      <div className="absolute top-3 left-14 z-[1000] bg-surface/90 backdrop-blur-md px-3 py-1.5 rounded-btn border border-border shadow-sm flex items-center gap-3 text-xs">
         <div className="flex items-center gap-1.5 font-semibold text-carbon-primary">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>OpenStreetMap GIS Tracker (No API Key Required)</span>

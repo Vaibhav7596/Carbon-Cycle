@@ -10,7 +10,8 @@ import {
   FileText, 
   ShieldCheck,
   LogOut,
-  LogIn
+  LogIn,
+  PanelLeftClose
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,9 +41,17 @@ interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   activeWasteCount: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activeWasteCount }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentTab,
+  onSelectTab,
+  activeWasteCount,
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const { user, isAuthenticated, logout, setAuthModalOpen } = useAuth();
 
   const navSections: Array<{ title: string; items: NavItem[] }> = [
@@ -73,24 +82,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activ
   ];
 
   return (
-    <aside className="w-64 bg-surface border-r border-border flex flex-col justify-between h-screen sticky top-0 z-30 select-none">
+    <aside className={`bg-surface border-r border-border flex flex-col justify-between h-screen sticky top-0 z-30 select-none transition-all duration-300 ease-in-out ${
+      isCollapsed
+        ? 'w-0 -translate-x-full overflow-hidden opacity-0 pointer-events-none border-r-0'
+        : 'w-64 translate-x-0 opacity-100'
+    }`}>
       <div>
         {/* Brand Header */}
-        <div 
-          onClick={() => onSelectTab('LANDING')}
-          className="p-5 border-b border-border/60 flex items-center gap-3 cursor-pointer hover:bg-surface-muted/50 transition"
-        >
-          <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center text-white shadow-sm">
-            <Leaf className="w-5 h-5 stroke-[2.5]" />
+        <div className="p-4 border-b border-border/60 flex items-center justify-between">
+          <div 
+            onClick={() => onSelectTab('LANDING')}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition"
+          >
+            <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center text-white shadow-sm flex-shrink-0">
+              <Leaf className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h1 className="font-bold text-sm tracking-wider uppercase text-carbon-primary">
+                CarbonCycle
+              </h1>
+              <p className="text-[11px] text-carbon-secondary font-medium">
+                Waste-to-Carbon Network
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-sm tracking-wider uppercase text-carbon-primary">
-              CarbonCycle
-            </h1>
-            <p className="text-[11px] text-carbon-secondary font-medium">
-              Waste-to-Carbon Network
-            </p>
-          </div>
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-btn text-carbon-muted hover:text-carbon-primary hover:bg-surface-muted transition ml-1"
+              title="Collapse Sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Groups */}

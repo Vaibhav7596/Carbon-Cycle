@@ -40,6 +40,16 @@ function AppContent() {
   const [selectedLotId, setSelectedLotId] = useState<string | undefined>(undefined);
   const [openReportLot, setOpenReportLot] = useState<WasteLot | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+
+  // Auto-collapse sidebar on RECOMMENDATION view to expand viewport and prevent crowding
+  useEffect(() => {
+    if (currentTab === 'RECOMMENDATION') {
+      setIsSidebarCollapsed(true);
+    } else {
+      setIsSidebarCollapsed(false);
+    }
+  }, [currentTab]);
 
   // Load state on initial mount & synchronize with MongoDB
   useEffect(() => {
@@ -153,19 +163,25 @@ function AppContent() {
         currentTab={currentTab}
         onSelectTab={handleNavigate}
         activeWasteCount={wasteLots.length}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         
-        {/* Topbar Header */}
-        <Topbar
-          currentTab={currentTab}
-          onSelectTab={handleNavigate}
-          onResetDemo={handleResetDemo}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
+        {/* Topbar Header (hidden specifically on Overview) */}
+        {currentTab !== 'DASHBOARD' && (
+          <Topbar
+            currentTab={currentTab}
+            onSelectTab={handleNavigate}
+            onResetDemo={handleResetDemo}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+        )}
 
         {/* View Router Body */}
         <main className="flex-1 overflow-y-auto pb-12">
@@ -215,6 +231,8 @@ function AppContent() {
               facilities={facilities}
               onConfirmMatch={handleConfirmMatch}
               onBack={() => setCurrentTab('WASTE')}
+              isSidebarCollapsed={isSidebarCollapsed}
+              onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
           )}
 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { WasteLot } from '../types';
 import { CalculationDrawer } from '../components/carbon/CalculationDrawer';
-import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { Leaf, Calculator, ArrowUpRight, ShieldCheck, Factory, Truck, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -28,9 +27,6 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      
-      {/* Disclaimer Banner */}
-      <DisclaimerBanner />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">

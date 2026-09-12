@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, RotateCcw, Search, Bell, ExternalLink, Sparkles } from 'lucide-react';
+import { Plus, RotateCcw, Search, Bell, ExternalLink, Sparkles, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
 interface TopbarProps {
@@ -8,6 +8,8 @@ interface TopbarProps {
   onResetDemo: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -16,6 +18,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   onResetDemo,
   searchQuery,
   onSearchChange,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -39,15 +43,26 @@ export const Topbar: React.FC<TopbarProps> = ({
   return (
     <header className="h-16 bg-surface border-b border-border px-6 flex items-center justify-between sticky top-0 z-20">
       {/* Page Title & Breadcrumb */}
-      <div>
-        <div className="flex items-center gap-2 text-[11px] font-medium text-carbon-secondary">
-          <span>CarbonCycle</span>
-          <span>/</span>
-          <span className="text-carbon-primary font-semibold">{currentInfo.title}</span>
+      <div className="flex items-center gap-3">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="p-1.5 rounded-btn border border-border text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted transition"
+            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar (Widescreen)"}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4 text-brand-primary" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
+        )}
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-medium text-carbon-secondary">
+            <span>CarbonCycle</span>
+            <span>/</span>
+            <span className="text-carbon-primary font-semibold">{currentInfo.title}</span>
+          </div>
+          <h1 className="text-sm font-semibold text-carbon-primary tracking-tight">
+            {currentInfo.subtitle}
+          </h1>
         </div>
-        <h1 className="text-sm font-semibold text-carbon-primary tracking-tight">
-          {currentInfo.subtitle}
-        </h1>
       </div>
 
       {/* Center Search Input */}
