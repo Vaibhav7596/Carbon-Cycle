@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, Mail, User as UserIcon, Building2, Factory, Trash2, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
+import { X, Lock, Mail, User as UserIcon, Building2, Factory, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, setAuthModalOpen, login, register } = useAuth();
+  const { isAuthModalOpen, setAuthModalOpen, authModalMode, login, register } = useAuth();
 
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
@@ -18,8 +18,9 @@ export const AuthModal: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const mouseDownTargetRef = React.useRef<EventTarget | null>(null);
 
-  // Always force blank inputs when modal opens so user must enter login ID and password
+  // Always force blank inputs and sync mode when modal opens
   useEffect(() => {
     if (isAuthModalOpen) {
       setEmail('');
@@ -28,9 +29,9 @@ export const AuthModal: React.FC = () => {
       setOrganizationName('');
       setError(null);
       setSubmitting(false);
-      setMode('LOGIN');
+      setMode(authModalMode || 'LOGIN');
     }
-  }, [isAuthModalOpen]);
+  }, [isAuthModalOpen, authModalMode]);
 
   // Lock background body scroll when auth modal is open
   useEffect(() => {
@@ -109,7 +110,14 @@ export const AuthModal: React.FC = () => {
 
   return (
     <div 
-      onClick={(e) => { if (e.target === e.currentTarget) setAuthModalOpen(false); }}
+      onMouseDown={(e) => {
+        mouseDownTargetRef.current = e.target;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget) {
+          setAuthModalOpen(false);
+        }
+      }}
       className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
     >
       {/* Modal Card with max height & scroll */}
@@ -235,37 +243,6 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
             </>
-          )}
-
-          {mode === 'LOGIN' && (
-            <div className="bg-surface-muted/60 p-2.5 rounded-btn border border-border space-y-1.5">
-              <span className="text-[10px] font-bold text-carbon-secondary uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-brand-primary" />
-                <span>Quick Fill Test Credentials:</span>
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('generator@carboncycle.io');
-                    setPassword('Password123!');
-                  }}
-                  className="px-2 py-1 rounded text-[10px] font-bold bg-surface hover:bg-brand-soft border border-border text-carbon-primary transition"
-                >
-                  🌾 Generator (generator@carboncycle.io)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('facility@carboncycle.io');
-                    setPassword('Password123!');
-                  }}
-                  className="px-2 py-1 rounded text-[10px] font-bold bg-surface hover:bg-brand-soft border border-border text-carbon-primary transition"
-                >
-                  🏭 Facility Operator (facility@carboncycle.io)
-                </button>
-              </div>
-            </div>
           )}
 
           <div>

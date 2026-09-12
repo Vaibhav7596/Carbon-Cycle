@@ -7,7 +7,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   isAuthModalOpen: boolean;
-  setAuthModalOpen: (open: boolean) => void;
+  authModalMode: 'LOGIN' | 'REGISTER';
+  setAuthModalOpen: (open: boolean, mode?: 'LOGIN' | 'REGISTER') => void;
+  setAuthModalMode: (mode: 'LOGIN' | 'REGISTER') => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (data: {
     name: string;
@@ -38,7 +40,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [loading, setLoading] = useState<boolean>(true);
-  const [isAuthModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+
+  const setAuthModalOpen = (open: boolean, mode?: 'LOGIN' | 'REGISTER') => {
+    if (mode) {
+      setAuthModalMode(mode);
+    }
+    setIsAuthModalOpen(open);
+  };
 
   // Restore session from token on initial mount
   useEffect(() => {
@@ -105,7 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         loading,
         isAuthModalOpen,
+        authModalMode,
         setAuthModalOpen,
+        setAuthModalMode,
         login,
         register,
         logout,

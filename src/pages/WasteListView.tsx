@@ -81,18 +81,11 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => onSelectTab('ADD_WASTE')}
-          className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>List Waste Batch</span>
-        </button>
-        {/* Hide + List Waste Batch button for facility operators */}
+        {/* List Waste Batch button for waste generators */}
         {!isFacilityOperator && (
           <button
             onClick={() => onSelectTab('ADD_WASTE')}
-            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition"
+            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>List Waste Batch</span>
@@ -201,7 +194,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                         {lot.status === 'REJECTED' ? (
                           <button
                             onClick={() => onSelectLot(lot.id)}
-                            className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold text-xs px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg shadow-xs"
+                            className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold text-xs px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg shadow-xs cursor-pointer"
                             title="Select an alternative facility"
                           >
                             <Eye className="w-3.5 h-3.5" />

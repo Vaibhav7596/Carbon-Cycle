@@ -4,11 +4,11 @@ import { NavTab } from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
 
 interface LandingPageProps {
-  onEnterPlatform: (tab: NavTab) => void;
+  onEnterPlatform: (tab: NavTab, authMode?: 'LOGIN' | 'REGISTER') => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, setAuthModalOpen } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -157,21 +157,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
               )}
             </div>
           ) : (
-            <>
-              <button
-                onClick={() => onEnterPlatform('DASHBOARD')}
-                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted rounded-btn transition border border-border"
-              >
-                <span>Sign In</span>
-              </button>
-              <button
-                onClick={() => onEnterPlatform('ADD_WASTE')}
-                className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95 cursor-pointer"
-              >
-                <span>Register Waste Batch</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => {
+                if (isAuthenticated) {
+                  onEnterPlatform('ADD_WASTE');
+                } else {
+                  setAuthModalOpen(true, 'REGISTER');
+                }
+              }}
+              className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95 cursor-pointer"
+            >
+              <span>Get Started</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           )}
         </div>
       </nav>
@@ -193,15 +192,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
 
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
           <button
-            onClick={() => onEnterPlatform('ADD_WASTE')}
-            className="flex items-center gap-2.5 bg-brand-primary hover:bg-brand-dark text-white font-bold text-sm px-6 py-3.5 rounded-btn shadow-float transition transform active:scale-95"
+            type="button"
+            onClick={() => onEnterPlatform('ADD_WASTE', 'LOGIN')}
+            className="flex items-center gap-2.5 bg-brand-primary hover:bg-brand-dark text-white font-bold text-sm px-6 py-3.5 rounded-btn shadow-float transition transform active:scale-95 cursor-pointer"
           >
             <span>Register Waste Batch</span>
             <ArrowRight className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onEnterPlatform('DASHBOARD')}
-            className="flex items-center gap-2 bg-surface hover:bg-surface-muted text-carbon-primary border border-border font-bold text-sm px-6 py-3.5 rounded-btn shadow-subtle transition"
+            type="button"
+            onClick={() => onEnterPlatform('DASHBOARD', 'LOGIN')}
+            className="flex items-center gap-2 bg-surface hover:bg-surface-muted text-carbon-primary border border-border font-bold text-sm px-6 py-3.5 rounded-btn shadow-subtle transition cursor-pointer"
           >
             <span>View Live Network</span>
           </button>
@@ -313,8 +314,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
           Start exploring India's active circular conversion ecosystem in seconds.
         </p>
         <button
-          onClick={() => onEnterPlatform('DASHBOARD')}
-          className="bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs px-6 py-3 rounded-btn shadow-lg transition"
+          type="button"
+          onClick={() => onEnterPlatform('DASHBOARD', 'LOGIN')}
+          className="bg-brand-primary hover:bg-brand-dark text-white font-bold text-xs px-6 py-3 rounded-btn shadow-lg transition cursor-pointer active:scale-95"
         >
           Launch CarbonCycle Dashboard →
         </button>

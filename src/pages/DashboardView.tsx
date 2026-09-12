@@ -45,7 +45,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={() => onSelectTab('ADD_WASTE')}
-            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition"
+            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>List Waste Batch</span>
@@ -248,7 +248,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {isActive && (
                         <button
                           onClick={(e) => { e.stopPropagation(); onSelectLot(lot.id); onSelectTab('LOGISTICS'); }}
-                          className="text-[9px] font-bold text-blue-700 hover:text-blue-900 underline"
+                          className="text-[9px] font-bold text-blue-700 hover:text-blue-900 underline cursor-pointer"
                         >
                           Track →
                         </button>

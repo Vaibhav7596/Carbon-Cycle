@@ -480,11 +480,14 @@ export function updateLotLifecycleStatus(
     }
   }
 
-  lot.timeline.push({
-    status: newStatus,
-    timestamp: dateStr,
-    note: customNote || defaultNote,
-  });
+  const lastEntry = lot.timeline[lot.timeline.length - 1];
+  if (!lastEntry || lastEntry.status !== newStatus) {
+    lot.timeline.push({
+      status: newStatus,
+      timestamp: dateStr,
+      note: customNote || defaultNote,
+    });
+  }
 
   saveStoredWasteLots(lots);
   return lot;

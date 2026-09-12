@@ -533,11 +533,14 @@ exports.updateLotStatus = async (req, res, next) => {
       COMPLETED: `Batch conversion complete. Certified Digital Impact Report generated.`,
     };
 
-    lot.timeline.push({
-      status,
-      timestamp: dateStr,
-      note: note || defaultNotes[status] || `Status updated to ${status}`,
-    });
+    const lastEntry = lot.timeline[lot.timeline.length - 1];
+    if (!lastEntry || lastEntry.status !== status) {
+      lot.timeline.push({
+        status,
+        timestamp: dateStr,
+        note: note || defaultNotes[status] || `Status updated to ${status}`,
+      });
+    }
 
     if (status === 'DELIVERED' && lot.logistics) {
       lot.logistics.deliveryTime = dateStr;
