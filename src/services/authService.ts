@@ -16,7 +16,9 @@ export interface AuthResponse {
   user?: AuthUser;
 }
 
-const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = (
+  (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:5000/api'
+).replace(/\/+$/, '');
 
 export async function registerApi(data: {
   name: string;
@@ -40,21 +42,10 @@ export async function registerApi(data: {
     }
     return json;
   } catch (err: any) {
-    console.warn('[Auth Service Warning]: Backend unavailable, using client session fallback.');
-    const assignedRole = data.role === 'facility_operator' ? 'facility_operator' : 'generator';
-    const mockUser: AuthUser = {
-      id: `usr-${Date.now()}`,
-      name: data.name,
-      email: data.email.toLowerCase(),
-      role: assignedRole,
-      organizationName: data.organizationName,
-      organizationType: data.organizationType || (assignedRole === 'facility_operator' ? 'Conversion Facility Operator' : 'Agricultural Enterprise'),
-      location: data.location || 'Gandhinagar, Gujarat',
-    };
+    console.error('[Auth Service Error]: Registration failed due to network/server connection error:', err);
     return {
-      success: true,
-      token: `demo_jwt_token_${Date.now()}`,
-      user: mockUser,
+      success: false,
+      message: 'Unable to connect to authentication server. Please check your connection or backend API URL.',
     };
   }
 }
@@ -69,29 +60,14 @@ export async function loginApi(data: { email: string; password: string }): Promi
 
     const json = await res.json();
     if (!res.ok) {
-      return { success: false, message: json.message || 'Invalid credentials' };
+      return { success: false, message: json.message || 'Invalid email or password' };
     }
     return json;
   } catch (err: any) {
-    console.warn('[Auth Service Warning]: Backend unavailable, using client session fallback.');
-    const isAdmin = data.email.includes('admin');
-    const isFacility = data.email.includes('facility');
-
-    const role: AuthUser['role'] = isAdmin ? 'admin' : isFacility ? 'facility_operator' : 'generator';
-
-    const mockUser: AuthUser = {
-      id: isAdmin ? 'usr-admin-001' : isFacility ? 'usr-fac-001' : 'usr-gen-001',
-      name: isAdmin ? 'Admin Controller' : isFacility ? 'Suresh Kumar' : 'Vaibhav Patel',
-      email: data.email.toLowerCase(),
-      role,
-      organizationName: isAdmin ? 'CarbonCycle Admin' : isFacility ? 'Gujarat EcoChar Pyrolysis Center' : 'Gandhinagar Farmers Co-op',
-      organizationType: isAdmin ? 'Network Administrator' : isFacility ? 'Conversion Facility Operator' : 'Agricultural Enterprise',
-      location: 'Gandhinagar, Gujarat',
-    };
+    console.error('[Auth Service Error]: Login failed due to network/server connection error:', err);
     return {
-      success: true,
-      token: `demo_jwt_token_${Date.now()}`,
-      user: mockUser,
+      success: false,
+      message: 'Unable to connect to authentication server. Please check your connection or backend API URL.',
     };
   }
 }
@@ -112,6 +88,7 @@ export async function getMeApi(token: string): Promise<AuthResponse> {
     }
     return json;
   } catch (err) {
+    console.error('[Auth Service Error]: Failed to reach server during session restoration:', err);
     return { success: false, message: 'Server unreachable' };
   }
 }
