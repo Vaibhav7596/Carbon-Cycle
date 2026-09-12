@@ -92,11 +92,11 @@ export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
         </div>
 
         {/* Reasoning Bullet Points */}
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2 pt-1">
           {reasoning.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-xs text-carbon-secondary">
-              <CheckCircle2 className="w-3.5 h-3.5 text-brand-primary flex-shrink-0" />
-              <span>{item}</span>
+            <div key={idx} className="flex items-start gap-2.5 text-xs text-carbon-secondary">
+              <CheckCircle2 className="w-4 h-4 min-w-[16px] min-h-[16px] text-brand-primary shrink-0 mt-0.5 overflow-visible" />
+              <span className="flex-1 leading-snug">{item}</span>
             </div>
           ))}
         </div>

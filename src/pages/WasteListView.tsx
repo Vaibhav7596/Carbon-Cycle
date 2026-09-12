@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { WasteLot } from '../types';
 import { WASTE_TYPE_LABELS } from '../data/constants';
 import { NavTab } from '../components/layout/Sidebar';
-import { Plus, Search, Filter, Trash2, ArrowRight, Eye, FileText, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, ArrowRight, Eye, FileText, CheckCircle2, Calculator } from 'lucide-react';
+import { CalculationDrawer } from '../components/carbon/CalculationDrawer';
 
 interface WasteListViewProps {
   wasteLots: WasteLot[];
@@ -21,12 +22,21 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [selectedDrawerLot, setSelectedDrawerLot] = useState<WasteLot | null>(null);
 
   const filteredLots = wasteLots.filter((lot) => {
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch = 
-      lot.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lot.generatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lot.matchedFacilityName && lot.matchedFacilityName.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      lot.id.toLowerCase().includes(q) ||
+      lot.generatorName.toLowerCase().includes(q) ||
+      lot.fingerprint.wasteType.toLowerCase().includes(q) ||
+      (WASTE_TYPE_LABELS[lot.fingerprint.wasteType]?.label &&
+        WASTE_TYPE_LABELS[lot.fingerprint.wasteType].label.toLowerCase().includes(q)) ||
+      (lot.fingerprint.location?.name && lot.fingerprint.location.name.toLowerCase().includes(q)) ||
+      (lot.fingerprint.location?.address && lot.fingerprint.location.address.toLowerCase().includes(q)) ||
+      (lot.matchedFacilityName && lot.matchedFacilityName.toLowerCase().includes(q)) ||
+      lot.status.toLowerCase().includes(q);
 
     const matchesType = filterType === 'ALL' || lot.fingerprint.wasteType === filterType;
     const matchesStatus = filterStatus === 'ALL' || lot.status === filterStatus;
@@ -60,7 +70,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
 
         <button
           onClick={() => onSelectTab('ADD_WASTE')}
-          className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-sm transition"
+          className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>List Waste Batch</span>
@@ -78,7 +88,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="bg-surface-muted/60 border border-border rounded-control px-2.5 py-1.5 text-xs text-carbon-primary focus:outline-none"
+            className="bg-surface-muted/60 border border-border rounded-control px-2.5 py-1.5 text-xs text-carbon-primary focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Waste Types</option>
             <option value="AGRICULTURAL_RESIDUE">Agricultural Residue</option>
@@ -91,7 +101,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-surface-muted/60 border border-border rounded-control px-2.5 py-1.5 text-xs text-carbon-primary focus:outline-none"
+            className="bg-surface-muted/60 border border-border rounded-control px-2.5 py-1.5 text-xs text-carbon-primary focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="LISTED">LISTED</option>
@@ -102,7 +112,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           </select>
         </div>
 
-        <span className="text-carbon-muted text-xs">
+        <span className="text-carbon-muted text-xs font-medium">
           Showing {filteredLots.length} of {wasteLots.length} batches
         </span>
       </div>
@@ -151,22 +161,50 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                         {lot.status}
                       </span>
                     </td>
-                    <td className="p-3.5 text-right space-x-2">
-                      <button
-                        onClick={() => onSelectLot(lot.id)}
-                        className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-dark font-semibold px-2 py-1 bg-brand-soft rounded"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Inspect</span>
-                      </button>
+                    <td className="p-3.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Inspect Icon Button */}
+                        <div className="relative group">
+                          <button
+                            onClick={() => onSelectLot(lot.id)}
+                            title="Inspect batch & AI match"
+                            className="w-8 h-8 rounded-lg bg-brand-soft text-brand-dark hover:bg-brand-primary hover:text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-full right-0 mb-1.5 px-2 py-1 bg-carbon-primary text-white text-[10px] font-semibold rounded shadow-modal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-20">
+                            Inspect & Match
+                          </div>
+                        </div>
 
-                      <button
-                        onClick={() => onOpenReport(lot)}
-                        className="inline-flex items-center gap-1 text-carbon-secondary hover:text-carbon-primary font-medium px-2 py-1 border border-border rounded"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Report</span>
-                      </button>
+                        {/* View Formula Icon Button */}
+                        <div className="relative group">
+                          <button
+                            onClick={() => setSelectedDrawerLot(lot)}
+                            title="View formula & carbon calculation"
+                            className="w-8 h-8 rounded-lg bg-surface border border-border text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 flex items-center justify-center transition cursor-pointer shadow-xs"
+                          >
+                            <Calculator className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-full right-0 mb-1.5 px-2 py-1 bg-carbon-primary text-white text-[10px] font-semibold rounded shadow-modal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-20">
+                            View Formula
+                          </div>
+                        </div>
+
+                        {/* Report Icon Button */}
+                        <div className="relative group">
+                          <button
+                            onClick={() => onOpenReport(lot)}
+                            title="View digital impact certificate"
+                            className="w-8 h-8 rounded-lg bg-surface border border-border text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted flex items-center justify-center transition cursor-pointer shadow-xs"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-full right-0 mb-1.5 px-2 py-1 bg-carbon-primary text-white text-[10px] font-semibold rounded shadow-modal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-20">
+                            Impact Certificate
+                          </div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -175,6 +213,15 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Slide-out Calculation Drawer */}
+      {selectedDrawerLot && (
+        <CalculationDrawer
+          isOpen={!!selectedDrawerLot}
+          onClose={() => setSelectedDrawerLot(null)}
+          lot={selectedDrawerLot}
+        />
+      )}
 
     </div>
   );

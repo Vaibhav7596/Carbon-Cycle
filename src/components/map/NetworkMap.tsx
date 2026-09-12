@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, ZoomControl } from 'react-leaflet';
 import { Facility, WasteLot } from '../../types';
 import { createFacilityIcon, createSourceIcon } from '../../utils/mapIcons';
 import { calculateHaversineDistanceKm, calculateTravelTimeMinutes, calculateTransportEmissionsCO2e } from '../../utils/haversine';
@@ -87,12 +87,12 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
     });
 
   return (
-    <div className="relative w-full rounded-card border border-border overflow-hidden bg-surface shadow-subtle">
+    <div className="relative w-full rounded-card border border-border overflow-hidden bg-surface shadow-subtle isolate z-0">
       {/* Map Header Overlay Bar */}
-      <div className="absolute top-3 left-3 z-[1000] bg-surface/90 backdrop-blur-md px-3 py-1.5 rounded-btn border border-border shadow-sm flex items-center gap-3 text-xs">
+      <div className="absolute top-3 left-3 z-10 bg-surface/90 backdrop-blur-md px-3 py-1.5 rounded-btn border border-border shadow-sm flex items-center gap-3 text-xs">
         <div className="flex items-center gap-1.5 font-semibold text-carbon-primary">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>OpenStreetMap GIS Tracker (No API Key Required)</span>
+          <span>OpenStreetMap GIS Tracker</span>
         </div>
         <span className="text-carbon-muted">|</span>
         <div className="flex items-center gap-3 text-[11px] text-carbon-secondary">
@@ -104,14 +104,11 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
       {/* Floating Prototype Route Visualization Summary Badge */}
       {routeSummary && (
-        <div className="absolute bottom-4 left-4 right-4 sm:right-auto z-[1000] bg-surface/95 backdrop-blur-md border border-border p-3 rounded-card shadow-modal max-w-md space-y-2 text-xs">
+        <div className="absolute bottom-4 left-4 right-4 sm:right-auto z-10 bg-surface/95 backdrop-blur-md border border-border p-3 rounded-card shadow-modal max-w-md space-y-2 text-xs">
           <div className="flex items-center justify-between border-b border-border pb-1.5">
             <span className="font-extrabold text-carbon-primary flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-brand-primary" />
               <span>Haversine GIS Route Visualization</span>
-            </span>
-            <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">
-              Direct Polyline
             </span>
           </div>
 
@@ -147,9 +144,11 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         <MapContainer
           center={[centerLat, centerLng]}
           zoom={10}
-          scrollWheelZoom={false}
+          scrollWheelZoom={true}
+          zoomControl={false}
           style={{ width: '100%', height: '100%' }}
         >
+          <ZoomControl position="topright" />
           {/* OpenStreetMap Base Layer */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

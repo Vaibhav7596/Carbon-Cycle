@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Facility, WasteLot } from '../types';
 import { AuthUser, API_BASE_URL } from '../services/authService';
-import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { ShieldCheck, Users, Factory, Trash2, Leaf, Settings, CheckCircle2, ChevronRight, BarChart3, Database, Key } from 'lucide-react';
 import { DEFAULT_EMISSION_FACTORS } from '../data/constants';
 
@@ -69,8 +68,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ wasteLot
           </div>
         </div>
       </div>
-
-      <DisclaimerBanner />
 
       {/* Admin Macro KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
