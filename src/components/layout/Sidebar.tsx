@@ -13,6 +13,7 @@ import {
   LogIn,
   PanelLeftClose,
   PanelLeftOpen
+  PanelLeftClose
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,9 +43,17 @@ interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   activeWasteCount: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activeWasteCount }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentTab,
+  onSelectTab,
+  activeWasteCount,
+  isCollapsed = false,
+  onToggleCollapse,
+}) => {
   const { user, isAuthenticated, logout, setAuthModalOpen } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
@@ -52,13 +61,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activ
     {
       title: 'OVERVIEW',
       items: [
-        { id: 'DASHBOARD', label: 'Overview', icon: LayoutDashboard },
+        { 
+          id: 'DASHBOARD', 
+          label: user?.role === 'facility_operator' ? 'Facility Dashboard' : 'Overview', 
+          icon: user?.role === 'facility_operator' ? Factory : LayoutDashboard,
+          badgeText: user?.role === 'facility_operator' ? 'OPERATOR' : undefined,
+        },
         ...(user?.role === 'admin' ? [{ id: 'ADMIN_DASHBOARD' as NavTab, label: 'Admin Dashboard', icon: ShieldCheck, badgeText: 'ADMIN' }] : []),
       ],
     },
     {
       title: 'OPERATIONS',
-      items: [
+      items: user?.role === 'facility_operator' ? [
+        { id: 'PROCESSING', label: 'Processing Queue', icon: Cpu },
+        { id: 'WASTE', label: 'Inbound Feedstock Lots', icon: Trash2, badge: activeWasteCount },
+        { id: 'LOGISTICS', label: 'Inbound Logistics', icon: Truck },
+        { id: 'FACILITIES', label: 'Network Facilities', icon: Factory },
+      ] : [
         { id: 'WASTE', label: 'Waste Lots', icon: Trash2, badge: activeWasteCount },
         { id: 'FACILITIES', label: 'Facilities', icon: Factory },
         { id: 'LOGISTICS', label: 'Logistics', icon: Truck },
@@ -132,6 +151,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, activ
                 <PanelLeftClose className="w-5 h-5" />
               </button>
             </>
+    <aside className={`bg-surface border-r border-border flex flex-col justify-between h-screen sticky top-0 z-30 select-none transition-all duration-300 ease-in-out ${
+      isCollapsed
+        ? 'w-0 -translate-x-full overflow-hidden opacity-0 pointer-events-none border-r-0'
+        : 'w-64 translate-x-0 opacity-100'
+    }`}>
+      <div>
+        {/* Brand Header */}
+        <div className="p-4 border-b border-border/60 flex items-center justify-between">
+          <div 
+            onClick={() => onSelectTab('LANDING')}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition"
+          >
+            <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center text-white shadow-sm flex-shrink-0">
+              <Leaf className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h1 className="font-bold text-sm tracking-wider uppercase text-carbon-primary">
+                CarbonCycle
+              </h1>
+              <p className="text-[11px] text-carbon-secondary font-medium">
+                Waste-to-Carbon Network
+              </p>
+            </div>
+          </div>
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-btn text-carbon-muted hover:text-carbon-primary hover:bg-surface-muted transition ml-1"
+              title="Collapse Sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
           )}
         </div>
 

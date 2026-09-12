@@ -28,6 +28,7 @@ export const CarbonImpactView: React.FC<CarbonImpactViewProps> = ({ wasteLots, o
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

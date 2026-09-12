@@ -3,13 +3,15 @@ import { Facility, WasteLot } from '../types';
 import { evaluatePathwaySuitability, matchFacilitiesForWaste } from '../services/recommendationEngine';
 import { ExplainableMatchCard } from '../components/matching/ExplainableMatchCard';
 import { WASTE_TYPE_LABELS } from '../data/constants';
-import { Sparkles, MapPin, Scale, Leaf, ArrowLeft, CheckCircle2, Factory, ChevronRight, Award } from 'lucide-react';
+import { Sparkles, MapPin, Scale, Leaf, ArrowLeft, CheckCircle2, Factory, ChevronRight, Award, ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface WasteIntelligenceViewProps {
   lot: WasteLot;
   facilities: Facility[];
   onConfirmMatch: (lotId: string, facilityId: string) => void;
   onBack: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
@@ -17,6 +19,8 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
   facilities,
   onConfirmMatch,
   onBack,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
 }) => {
   const { fingerprint } = lot;
   const wasteMeta = WASTE_TYPE_LABELS[fingerprint.wasteType] || { label: fingerprint.wasteType };
@@ -25,22 +29,35 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
   const pathwaySuitabilities = evaluatePathwaySuitability(fingerprint);
   const [selectedPathway, setSelectedPathway] = useState(pathwaySuitabilities[0].pathway);
 
+  // Collapsible toggle states to declutter the viewport
+  const [showAllPathways, setShowAllPathways] = useState(false);
+  const [showAllAlternatives, setShowAllAlternatives] = useState(false);
+
   // Run Facility Matcher for selected pathway
   const matchedResults = matchFacilitiesForWaste(fingerprint, facilities, selectedPathway);
 
   const topMatch = matchedResults[0];
   const alternativeMatches = matchedResults.slice(1);
 
+  // Pathways to show based on toggle
+  const visiblePathways = showAllPathways
+    ? pathwaySuitabilities
+    : pathwaySuitabilities.filter((p) => p.pathway === selectedPathway).length > 0
+    ? pathwaySuitabilities.filter((p) => p.pathway === selectedPathway)
+    : [pathwaySuitabilities[0]];
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
+      {/* Top Header Row with Viewport & Sidebar Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
             title="Back to Waste Batches"
             className="p-2.5 rounded-xl border border-border bg-surface text-carbon-primary hover:bg-surface-muted transition cursor-pointer shadow-xs flex items-center justify-center"
+            className="p-1.5 rounded-btn border border-border text-carbon-secondary hover:text-carbon-primary hover:bg-surface-muted transition"
+            title="Back to Waste Lots"
           >
             <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
@@ -56,12 +73,35 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
             </p>
           </div>
         </div>
-      </div>
 
       {/* 2-Column Grid: Left Fingerprint & Pathway Suitability / Right Facility Matches */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Sidebar Expansion / Widescreen Mode Toggle */}
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-btn border border-border bg-surface hover:bg-surface-muted text-carbon-primary shadow-xs transition"
+            title={isSidebarCollapsed ? "Expand navigation sidebar" : "Hide sidebar to widen view"}
+          >
+            {isSidebarCollapsed ? (
+              <>
+                <PanelLeftOpen className="w-4 h-4 text-brand-primary" />
+                <span>Show Sidebar</span>
+              </>
+            ) : (
+              <>
+                <PanelLeftClose className="w-4 h-4 text-carbon-muted" />
+                <span>Widescreen (Hide Sidebar)</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* 2-Column Grid: Left Fingerprint, Pathways & Alternatives / Right Hero Facility Match */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Column (5 cols): Waste Fingerprint & Pathway Scores */}
+        {/* Left Column (5 cols): Waste Fingerprint, Evaluated Pathways & Alternative Facilities */}
         <div className="lg:col-span-5 space-y-6">
           
           {/* Fingerprint Card */}
@@ -103,17 +143,17 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
             </div>
           </div>
 
-          {/* Candidate Pathways Ranking */}
-          <div className="bg-surface border border-border rounded-card p-5 space-y-4 shadow-subtle">
+          {/* Candidate Pathways Ranking with Show More / Show Less */}
+          <div className="bg-surface border border-border rounded-card p-5 space-y-3 shadow-subtle">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h2 className="font-bold text-xs uppercase tracking-wider text-carbon-muted">
                 Evaluated Conversion Pathways
               </h2>
-              <span className="text-[10px] text-carbon-secondary">Rule-Based Fit</span>
+              <span className="text-[10px] text-carbon-secondary font-medium">Rule-Based Fit</span>
             </div>
 
-            <div className="space-y-3">
-              {pathwaySuitabilities.map((path) => {
+            <div className="space-y-2.5">
+              {visiblePathways.map((path) => {
                 const isSelected = selectedPathway === path.pathway;
 
                 return (
@@ -145,49 +185,99 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
                 );
               })}
             </div>
+
+            {/* Show More / Less Pathways Button */}
+            {pathwaySuitabilities.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowAllPathways(!showAllPathways)}
+                className="w-full py-2 text-xs font-bold text-brand-primary bg-brand-soft/50 hover:bg-brand-soft rounded-btn border border-brand-primary/20 transition flex items-center justify-center gap-1.5 mt-1"
+              >
+                <span>
+                  {showAllPathways
+                    ? 'Show Less Pathways'
+                    : `Show More Pathways (+${pathwaySuitabilities.length - visiblePathways.length} options)`}
+                </span>
+                {showAllPathways ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            )}
           </div>
 
         </div>
 
-        {/* Right Column (7 cols): Facility Recommendation & Ranking */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Right Column (7 cols): Primary Hero Facility Recommendation & Alternative Facilities */}
+        <div className="lg:col-span-7 space-y-5">
           
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-extrabold text-base text-carbon-primary">Facility Matching Engine</h2>
               <p className="text-xs text-carbon-secondary">Ranked by Compatibility, Distance, Capacity, and Carbon Benefit.</p>
             </div>
-            <span className="text-xs text-carbon-muted">
+            <span className="text-xs text-carbon-muted bg-surface-muted px-2.5 py-1 rounded-full border border-border font-medium">
               Found {matchedResults.length} Compatible Facilities
             </span>
           </div>
 
-          {/* Primary #1 Recommendation Card */}
-          {topMatch && (
+          {/* Primary #1 Recommendation Hero Card (Contains Confirm & Select Facility) */}
+          {topMatch ? (
             <ExplainableMatchCard
               match={topMatch}
               isTopMatch={true}
               onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
             />
+          ) : (
+            <div className="p-8 bg-surface border border-border rounded-card text-center text-xs text-carbon-muted">
+              No matching facility found for the selected pathway.
+            </div>
           )}
 
-          {/* Alternative Facilities Comparison */}
+          {/* Alternative Compatible Facilities: Only show button initially below confirm & select facility */}
           {alternativeMatches.length > 0 && (
-            <div className="space-y-4 pt-2">
-              <h3 className="font-bold text-xs text-carbon-muted uppercase tracking-wider">
-                Alternative Compatible Facilities
-              </h3>
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAllAlternatives(!showAllAlternatives)}
+                className="w-full py-3 px-4 text-xs font-bold text-carbon-primary bg-surface hover:bg-surface-muted rounded-btn border border-border shadow-xs hover:border-brand-primary/40 transition flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-brand-primary"></span>
+                  <span className="font-bold text-carbon-primary">
+                    Alternative Compatible Facilities
+                  </span>
+                  <span className="text-[11px] text-carbon-muted font-medium ml-1">
+                    ({alternativeMatches.length} options available)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-brand-primary font-bold text-xs">
+                  <span>{showAllAlternatives ? 'Hide Alternatives' : 'Show Alternatives'}</span>
+                  {showAllAlternatives ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </button>
 
-              <div className="space-y-4">
-                {alternativeMatches.map((altMatch) => (
-                  <ExplainableMatchCard
-                    key={altMatch.facility.id}
-                    match={altMatch}
-                    isTopMatch={false}
-                    onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
-                  />
-                ))}
-              </div>
+              {/* Cards appear only when the button is opened */}
+              {showAllAlternatives && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between px-1">
+                    <h3 className="font-bold text-xs text-carbon-muted uppercase tracking-wider">
+                      Alternative Ranked Facilities
+                    </h3>
+                    <span className="text-[11px] text-carbon-secondary">
+                      {alternativeMatches.length} facilities
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {alternativeMatches.map((altMatch) => (
+                      <ExplainableMatchCard
+                        key={altMatch.facility.id}
+                        match={altMatch}
+                        isTopMatch={false}
+                        onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { Facility, WasteLot } from '../types';
 import { NetworkMap } from '../components/map/NetworkMap';
 import { NavTab } from '../components/layout/Sidebar';
-import { Trash2, Factory, Leaf, ArrowUpRight, TrendingUp, CheckCircle2, Truck, Plus, ChevronRight } from 'lucide-react';
+import { Trash2, Factory, Leaf, ArrowUpRight, TrendingUp, CheckCircle2, Truck, Plus, ChevronRight, Cpu } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardViewProps {
@@ -35,6 +35,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+
       {/* Header Row */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -59,7 +60,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="p-4 bg-surface border border-border rounded-card shadow-subtle space-y-2">
           <div className="flex items-center justify-between text-xs font-medium text-carbon-secondary">
             <span>Total Waste Registered</span>
-            <Trash2 className="w-4 h-4 text-carbon-muted" />
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-extrabold text-carbon-primary tracking-tight">
@@ -224,6 +224,61 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
 
+      </div>
+
+      {/* Waste Flow Ecosystem Diagram */}
+      <div className="bg-surface border border-border rounded-card p-5 space-y-4 shadow-subtle">
+        <h2 className="font-bold text-sm text-carbon-primary">Waste Source to Conversion Facility Flow</h2>
+        <p className="text-xs text-carbon-secondary">Visual representation of active circular pathways across generators and processing destinations.</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-4 bg-surface-muted/30 rounded-btn border border-border/60 text-xs">
+          
+          {/* Sources */}
+          <div className="space-y-2">
+            <span className="font-bold uppercase text-[10px] text-carbon-muted">Waste Generators</span>
+            <div className="p-2.5 bg-surface border border-border rounded-btn font-semibold text-carbon-primary shadow-xs">
+              🌾 Agricultural Farms (Gandhinagar)
+            </div>
+            <div className="p-2.5 bg-surface border border-border rounded-btn font-semibold text-carbon-primary shadow-xs">
+              🍏 Wholesale Food Markets (Ahmedabad)
+            </div>
+            <div className="p-2.5 bg-surface border border-border rounded-btn font-semibold text-carbon-primary shadow-xs">
+              🐄 Livestock Cooperatives (Kheda)
+            </div>
+          </div>
+
+          {/* Decision Engine Connector */}
+          <div className="text-center py-2 space-y-2 flex flex-col items-center">
+            <div className="inline-flex flex-col items-center justify-center px-4 py-2.5 bg-brand-soft/60 border-2 border-dashed border-brand-primary/40 rounded-xl">
+              <div className="flex items-center gap-1.5 font-bold text-xs text-brand-dark">
+                <Cpu className="w-3.5 h-3.5 text-brand-primary" />
+                <span>CarbonCycle Decision Engine</span>
+              </div>
+              <span className="text-[10px] text-carbon-secondary font-medium mt-0.5">Automated Multi-Criteria Matching</span>
+            </div>
+            <p className="text-[10px] text-carbon-secondary font-medium max-w-[240px]">
+              40% Compatibility + 25% Distance + 20% Capacity + 15% Carbon
+            </p>
+          </div>
+
+          {/* Facilities */}
+          <div className="space-y-2">
+            <span className="font-bold uppercase text-[10px] text-carbon-muted">Conversion Hubs</span>
+            <div className="p-2.5 bg-brand-soft border border-brand-primary/30 rounded-btn font-semibold text-brand-dark shadow-xs flex justify-between">
+              <span>🔥 Gujarat EcoChar Center</span>
+              <span className="font-bold">Biochar</span>
+            </div>
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-btn font-semibold text-emerald-800 shadow-xs flex justify-between">
+              <span>⚡ GreenBio Energy Plant</span>
+              <span className="font-bold">Biogas</span>
+            </div>
+            <div className="p-2.5 bg-surface border border-border rounded-btn font-semibold text-carbon-primary shadow-xs flex justify-between">
+              <span>🌱 Sabarmati Organic Hub</span>
+              <span className="font-bold">Compost</span>
+            </div>
+          </div>
+
+        </div>
       </div>
 
     </div>

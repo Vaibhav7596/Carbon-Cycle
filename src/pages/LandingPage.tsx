@@ -305,7 +305,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
       <section className="bg-carbon-primary text-white py-16 px-6 text-center space-y-6">
         <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">Ready to optimize your waste-to-carbon network?</h2>
         <p className="text-xs sm:text-sm text-gray-300 max-w-lg mx-auto">
-          Start exploring Gujarat's active circular conversion ecosystem in seconds.
+          Start exploring India's active circular conversion ecosystem in seconds.
         </p>
         <button
           onClick={() => onEnterPlatform('DASHBOARD')}
