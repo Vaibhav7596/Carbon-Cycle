@@ -57,4 +57,43 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+const optionalProtect = async (req, res, next) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const secret = process.env.JWT_SECRET || 'carboncycle_super_secret_jwt_key_2026_hackathon';
+      const decoded = jwt.verify(token, secret);
+
+      if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(decoded.id)) {
+        try {
+          const user = await User.findById(decoded.id).select('-password');
+          if (user) {
+            req.user = user;
+            return next();
+          }
+        } catch (dbErr) {
+          // Fall through
+        }
+      }
+
+      req.user = {
+        id: decoded.id,
+        _id: decoded.id,
+        name: decoded.name || 'User',
+        email: decoded.email || 'user@example.com',
+        role: decoded.role || 'user',
+        organizationName: decoded.organizationName || 'Agri Co-op',
+        organizationType: decoded.organizationType || 'Agricultural Enterprise',
+        location: decoded.location || 'Gandhinagar',
+      };
+    } catch (err) {
+      // Ignore token parse error for optional endpoints
+    }
+  }
+  next();
+};
+
+module.exports = { protect, optionalProtect };

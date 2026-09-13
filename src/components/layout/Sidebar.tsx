@@ -84,7 +84,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'PROCESSING', label: 'Processing Queue', icon: Cpu },
         { id: 'WASTE', label: 'Inbound Feedstock Lots', icon: Trash2, badge: activeWasteCount },
         { id: 'LOGISTICS', label: 'Inbound Logistics', icon: Truck },
-        { id: 'FACILITIES', label: 'Network Facilities', icon: Factory },
       ] : [
         { id: 'WASTE', label: 'Waste Lots', icon: Trash2, badge: activeWasteCount },
         { id: 'FACILITIES', label: 'Facilities', icon: Factory },

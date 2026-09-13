@@ -149,7 +149,7 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                 <th className="p-3.5">Waste Type</th>
                 <th className="p-3.5 text-right">Quantity</th>
                 <th className="p-3.5">Generator</th>
-                <th className="p-3.5">Matched Facility</th>
+                {!isFacilityOperator && <th className="p-3.5">Matched Facility</th>}
                 <th className="p-3.5 text-right">Net CO₂e</th>
                 <th className="p-3.5">Status</th>
                 <th className="p-3.5 text-right">Actions</th>
@@ -168,15 +168,17 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                       {lot.fingerprint.quantityTonnes} t
                     </td>
                     <td className="p-3.5 font-medium text-carbon-primary">{lot.generatorName}</td>
-                    <td className="p-3.5 text-carbon-secondary">
-                      {lot.matchedFacilityName ? (
-                        <span className="font-semibold text-brand-dark">{lot.matchedFacilityName}</span>
-                      ) : lot.requestedFacilityName ? (
-                        <span className="text-amber-700 font-medium">Pending: {lot.requestedFacilityName}</span>
-                      ) : (
-                        <span className="text-carbon-muted italic">Unmatched</span>
-                      )}
-                    </td>
+                    {!isFacilityOperator && (
+                      <td className="p-3.5 text-carbon-secondary">
+                        {lot.matchedFacilityName ? (
+                          <span className="font-semibold text-brand-dark">{lot.matchedFacilityName}</span>
+                        ) : lot.requestedFacilityName ? (
+                          <span className="text-amber-700 font-medium">Pending: {lot.requestedFacilityName}</span>
+                        ) : (
+                          <span className="text-carbon-muted italic">Unmatched</span>
+                        )}
+                      </td>
+                    )}
                     <td className="p-3.5 font-bold text-emerald-700 text-right">
                       {netCO2e > 0 ? `+${netCO2e}` : '-'} tCO₂e
                     </td>
@@ -191,28 +193,30 @@ export const WasteListView: React.FC<WasteListViewProps> = ({
                     </td>
                     <td className="p-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {lot.status === 'REJECTED' ? (
-                          <button
-                            onClick={() => onSelectLot(lot.id)}
-                            className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold text-xs px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg shadow-xs cursor-pointer"
-                            title="Select an alternative facility"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Select Alternative</span>
-                          </button>
-                        ) : (
-                          <div className="relative group">
+                        {!isFacilityOperator && (
+                          lot.status === 'REJECTED' ? (
                             <button
                               onClick={() => onSelectLot(lot.id)}
-                              title="Inspect batch & AI match"
-                              className="w-8 h-8 rounded-lg bg-brand-soft text-brand-dark hover:bg-brand-primary hover:text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                              className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 font-bold text-xs px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg shadow-xs cursor-pointer"
+                              title="Select an alternative facility"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Select Alternative</span>
                             </button>
-                            <div className="absolute bottom-full right-0 mb-1.5 px-2 py-1 bg-carbon-primary text-white text-[10px] font-semibold rounded shadow-modal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-20">
-                              Inspect & Match
+                          ) : (
+                            <div className="relative group">
+                              <button
+                                onClick={() => onSelectLot(lot.id)}
+                                title="Inspect batch & AI match"
+                                className="w-8 h-8 rounded-lg bg-brand-soft text-brand-dark hover:bg-brand-primary hover:text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <div className="absolute bottom-full right-0 mb-1.5 px-2 py-1 bg-carbon-primary text-white text-[10px] font-semibold rounded shadow-modal whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-20">
+                                Inspect & Match
+                              </div>
                             </div>
-                          </div>
+                          )
                         )}
 
                         {/* View Formula Icon Button */}

@@ -198,6 +198,41 @@ export async function fetchFacilitiesApi(): Promise<Facility[]> {
   return getStoredFacilities();
 }
 
+export async function updateFacilityApi(
+  facilityId: string,
+  updates: Partial<Facility>
+): Promise<Facility | null> {
+  try {
+    const token = localStorage.getItem('carboncycle_auth_token_v1');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE_URL}/facilities/${facilityId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(updates),
+    });
+
+    const json = await res.json();
+    if (json.success && json.facility) {
+      const current = getStoredFacilities();
+      const updated = current.map((f) => (f.id === facilityId ? json.facility : f));
+      saveStoredFacilities(updated);
+      return json.facility;
+    }
+  } catch (error) {
+    console.warn('[Store API Warning]: Failed to update facility on server, falling back to local.', error);
+  }
+  const current = getStoredFacilities();
+  const index = current.findIndex((f) => f.id === facilityId);
+  if (index !== -1) {
+    current[index] = { ...current[index], ...updates };
+    saveStoredFacilities(current);
+    return current[index];
+  }
+  return null;
+}
+
 export async function createWasteLotApi(
   generatorName: string,
   generatorType: string,
@@ -208,10 +243,22 @@ export async function createWasteLotApi(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    let storedUser: any = null;
+    try {
+      const raw = localStorage.getItem('carboncycle_auth_user_v1');
+      if (raw) storedUser = JSON.parse(raw);
+    } catch (e) {}
+
     const res = await fetch(`${API_BASE_URL}/waste-lots`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ generatorName, generatorType, fingerprint }),
+      body: JSON.stringify({
+        generatorName: generatorName || storedUser?.organizationName || storedUser?.name,
+        generatorType: generatorType || storedUser?.organizationType,
+        generatorId: storedUser?.id || storedUser?._id,
+        generatorContact: storedUser?.email,
+        fingerprint,
+      }),
     });
 
     const json = await res.json();
@@ -454,19 +501,33 @@ export function createNewWasteLot(
   const now = new Date();
   const dateStr = now.toISOString().replace('T', ' ').slice(0, 16);
 
+  let storedUser: any = null;
+  try {
+    const raw = localStorage.getItem('carboncycle_auth_user_v1');
+    if (raw) storedUser = JSON.parse(raw);
+  } catch (e) {}
+
+  const finalName = generatorName || storedUser?.organizationName || storedUser?.name || 'Regional Agro Source';
+  const finalType = generatorType || storedUser?.organizationType || 'Agricultural Enterprise';
+
+  const initialImpact = calculateBatchImpact(fingerprint, recommendedPathway, 15);
+
   const newLot: WasteLot = {
     id: newId,
     createdAt: now.toISOString(),
-    generatorName: generatorName || 'Regional Agro Source',
-    generatorType: generatorType || 'Agricultural Enterprise',
+    generatorId: storedUser?.id || storedUser?._id,
+    generatorContact: storedUser?.email,
+    generatorName: finalName,
+    generatorType: finalType,
     fingerprint,
     status: 'LISTED',
     selectedPathway: recommendedPathway,
+    impactMetrics: initialImpact,
     timeline: [
       {
         status: 'LISTED',
         timestamp: dateStr,
-        note: `Waste batch listed by ${generatorName || 'Generator'}`,
+        note: `Waste batch listed by ${finalName}`,
       },
       {
         status: 'ANALYZED',

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { optionalProtect } = require('../middleware/authMiddleware');
 const {
   getWasteLots,
   getWasteLotById,
@@ -11,7 +12,7 @@ const {
   resetDemoData,
 } = require('../controllers/wasteLotController');
 
-router.route('/').get(getWasteLots).post(createWasteLot);
+router.route('/').get(getWasteLots).post(optionalProtect, createWasteLot);
 router.route('/reset').post(resetDemoData);
 router.route('/:id').get(getWasteLotById);
 router.route('/:id/match').put(matchFacility);

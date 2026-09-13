@@ -53,9 +53,10 @@ export interface Facility {
   processingCostPerTon: number;
   carbonFactorPerTon: number;
   rating: number;
-  contactEmail: string;
+  contactEmail?: string;
   activeBatchesCount: number;
   status: 'ACTIVE' | 'FULL' | 'MAINTENANCE';
+  operatorId?: string;
 }
 
 export interface PathwaySuitability {
@@ -130,9 +131,28 @@ export interface ProcessingYield {
   estimatedCompletionAt: string;
 }
 
+export interface RequestedFacilityEntry {
+  facilityId: string;
+  facilityName: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'SUPERSEDED';
+  requestedAt: string;
+  rejectionReason?: string;
+}
+
+export interface FacilityRegistrationProfile {
+  name?: string;
+  type: PathwayType;
+  maxCapacityTonnes: number;
+  processingCostPerTon: number;
+  acceptedWasteTypes: WasteType[];
+  location?: LocationPoint;
+}
+
 export interface WasteLot {
   id: string; // e.g. W2C-2026-00125
   createdAt: string;
+  generatorId?: string;
+  generatorContact?: string;
   generatorName: string;
   generatorType: string;
   fingerprint: WasteFingerprint;
@@ -140,6 +160,7 @@ export interface WasteLot {
   selectedPathway?: PathwayType;
   requestedFacilityId?: string;
   requestedFacilityName?: string;
+  requestedFacilities?: RequestedFacilityEntry[];
   rejectionReason?: string;
   gateArrivalTime?: string;
   matchedFacilityId?: string;
