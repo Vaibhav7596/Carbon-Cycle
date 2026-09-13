@@ -49,7 +49,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
         </div>
 
         <div className="flex items-center gap-3">
-          {isAuthenticated && user ? (
+          {isAuthenticated && user && (
             <div className="relative" ref={profileMenuRef}>
               {/* Profile Pill Button */}
               <button
@@ -156,21 +156,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
                 </div>
               )}
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                if (isAuthenticated) {
-                  onEnterPlatform('ADD_WASTE');
-                } else {
-                  setAuthModalOpen(true, 'REGISTER');
-                }
-              }}
-              className="flex items-center gap-2 bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-btn shadow-md hover:shadow-lg transition transform active:scale-95 cursor-pointer"
-            >
-              <span>Get Started</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
           )}
         </div>
       </nav>
@@ -193,10 +178,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterPlatform }) => 
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
           <button
             type="button"
-            onClick={() => onEnterPlatform('ADD_WASTE', 'LOGIN')}
+            onClick={() => onEnterPlatform('DASHBOARD', 'LOGIN')}
             className="flex items-center gap-2.5 bg-brand-primary hover:bg-brand-dark text-white font-bold text-sm px-6 py-3.5 rounded-btn shadow-float transition transform active:scale-95 cursor-pointer"
           >
-            <span>Register Waste Batch</span>
+            <span>{isAuthenticated ? 'Launch Dashboard' : 'Get Started'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
           <button

@@ -229,7 +229,7 @@ const autoDetectRoleFromEmail = (email) => {
 // @access  Public
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, organizationName, organizationType, location, role } = req.body;
+    const { name, email, password, organizationName, organizationType, location, role, facilityProfile } = req.body;
 
     if (!name || !email || !password || !organizationName) {
       return res.status(400).json({
@@ -281,10 +281,49 @@ const register = async (req, res, next) => {
             ],
           });
 
+          // Determine facility specs from user-provided facilityProfile or defaults
+          const parsedType = facilityProfile?.type || (
+            organizationName.toLowerCase().includes('biogas') || organizationName.toLowerCase().includes('methan') || organizationName.toLowerCase().includes('cbg')
+              ? 'BIOGAS'
+              : organizationName.toLowerCase().includes('compost')
+              ? 'COMPOSTING'
+              : 'BIOCHAR'
+          );
+
+          const maxCap = Number(facilityProfile?.maxCapacityTonnes) > 0 ? Number(facilityProfile.maxCapacityTonnes) : 60.0;
+          const costPerTon = Number(facilityProfile?.processingCostPerTon) > 0 ? Number(facilityProfile.processingCostPerTon) : 950;
+          const acceptedTypes = Array.isArray(facilityProfile?.acceptedWasteTypes) && facilityProfile.acceptedWasteTypes.length > 0
+            ? facilityProfile.acceptedWasteTypes
+            : ['AGRICULTURAL_RESIDUE', 'FOOD_WASTE', 'ANIMAL_MANURE', 'BIOMASS_WOOD', 'MUNICIPAL_ORGANIC'];
+
+          const locObj = facilityProfile?.location && typeof facilityProfile.location === 'object' && facilityProfile.location.lat
+            ? facilityProfile.location
+            : {
+                name: organizationName || 'Regional Conversion Center',
+                address: location || 'Gandhinagar Bio-Industrial Zone, Gujarat',
+                lat: 23.220 + (Math.random() * 0.08 - 0.04),
+                lng: 72.650 + (Math.random() * 0.08 - 0.04),
+              };
+
+          const carbonFactors = {
+            BIOCHAR: 0.45,
+            BIOGAS: 0.52,
+            COMPOSTING: 0.32,
+            SYNTHETICS: 0.28,
+          };
+          const carbonFactor = carbonFactors[parsedType] || 0.4;
+
           if (existingFac) {
             existingFac.operatorId = user._id;
             existingFac.contactEmail = normalizedEmail;
             existingFac.status = 'ACTIVE';
+            existingFac.type = parsedType;
+            existingFac.maxCapacityTonnes = maxCap;
+            existingFac.availableCapacityTonnes = maxCap;
+            existingFac.processingCostPerTon = costPerTon;
+            existingFac.acceptedWasteTypes = acceptedTypes;
+            existingFac.carbonFactorPerTon = carbonFactor;
+            if (locObj) existingFac.location = locObj;
             await existingFac.save();
           } else {
             const allFacs = await Facility.find({}, 'id');
@@ -298,38 +337,20 @@ const register = async (req, res, next) => {
             });
             const facId = `FAC-${String(maxNum + 1).padStart(3, '0')}`;
 
-            let facType = 'BIOCHAR';
-            const orgLower = organizationName.toLowerCase();
-            if (orgLower.includes('biogas') || orgLower.includes('methan') || orgLower.includes('cbg') || orgLower.includes('energy')) {
-              facType = 'BIOGAS';
-            } else if (orgLower.includes('compost') || orgLower.includes('organic')) {
-              facType = 'COMPOSTING';
-            }
-
             await Facility.create({
               id: facId,
-              name: organizationName || `${name}'s Circular Processing Center`,
-              type: facType,
-              acceptedWasteTypes: [
-                'AGRICULTURAL_RESIDUE',
-                'FOOD_WASTE',
-                'ANIMAL_MANURE',
-                'BIOMASS_WOOD',
-                'MUNICIPAL_ORGANIC',
-              ],
-              maxCapacityTonnes: 60.0,
-              availableCapacityTonnes: 45.0,
-              location: {
-                name: location || 'Gandhinagar Bio-Park',
-                address: location || 'Sector 24, Gandhinagar, Gujarat',
-                lat: 23.235,
-                lng: 72.658,
-              },
-              processingCostPerTon: 950,
-              carbonFactorPerTon: 0.45,
+              name: facilityProfile?.name || organizationName || `${name}'s Circular Processing Center`,
+              type: parsedType,
+              acceptedWasteTypes: acceptedTypes,
+              maxCapacityTonnes: maxCap,
+              availableCapacityTonnes: maxCap,
+              location: locObj,
+              processingCostPerTon: costPerTon,
+              carbonFactorPerTon: carbonFactor,
               contactEmail: normalizedEmail,
               operatorId: user._id,
               status: 'ACTIVE',
+              rating: 4.9,
             });
           }
         } catch (facErr) {
@@ -376,6 +397,37 @@ const register = async (req, res, next) => {
     const safeUser = { ...newUser };
     delete safeUser.password;
     delete safeUser.hashedPassword;
+
+    if (assignedRole === 'facility_operator') {
+      try {
+        const { SEEDED_FACILITIES } = require('../data/seedData');
+        const facId = `FAC-${String(SEEDED_FACILITIES.length + 1).padStart(3, '0')}`;
+        SEEDED_FACILITIES.push({
+          id: facId,
+          name: facilityProfile?.name || organizationName || `${name}'s Circular Conversion Facility`,
+          type: facilityProfile?.type || 'BIOCHAR',
+          acceptedWasteTypes: facilityProfile?.acceptedWasteTypes || ['AGRICULTURAL_RESIDUE', 'BIOMASS_WOOD'],
+          maxCapacityTonnes: Number(facilityProfile?.maxCapacityTonnes) > 0 ? Number(facilityProfile.maxCapacityTonnes) : 50.0,
+          availableCapacityTonnes: Number(facilityProfile?.maxCapacityTonnes) > 0 ? Number(facilityProfile.maxCapacityTonnes) : 50.0,
+          location: {
+            name: organizationName || 'Conversion Center',
+            address: location || 'Gandhinagar Bio-Industrial Zone, Gujarat',
+            lat: 23.2156,
+            lng: 72.6369,
+          },
+          processingCostPerTon: Number(facilityProfile?.processingCostPerTon) > 0 ? Number(facilityProfile.processingCostPerTon) : 950,
+          carbonFactorPerTon: 0.45,
+          contactEmail: normalizedEmail,
+          operatorId: newUser._id,
+          activeBatchesCount: 0,
+          status: 'ACTIVE',
+          rating: 5.0,
+        });
+        safeUser.facilityId = facId;
+      } catch (memFacErr) {
+        console.warn('Could not register in-memory facility:', memFacErr.message);
+      }
+    }
 
     return res.status(201).json({
       success: true,

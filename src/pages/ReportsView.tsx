@@ -70,7 +70,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ wasteLots, onOpenRepor
       <div className="space-y-4">
         {filteredLots.length === 0 ? (
           <div className="p-8 text-center text-xs text-carbon-muted bg-surface rounded-xl border border-dashed border-border">
-            No impact certificates matching "{searchQuery}".
+            {searchQuery
+              ? `No impact certificates matching "${searchQuery}".`
+              : 'No impact certificates generated yet. Complete waste-to-conversion batches to issue digital MRV certificates.'}
           </div>
         ) : (
           filteredLots.map((lot) => {

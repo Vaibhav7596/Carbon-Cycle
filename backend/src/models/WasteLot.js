@@ -19,6 +19,21 @@ const timelineEntrySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const requestedFacilitySchema = new mongoose.Schema(
+  {
+    facilityId: { type: String, required: true },
+    facilityName: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'SUPERSEDED'],
+      default: 'PENDING',
+    },
+    requestedAt: { type: String, required: true },
+    rejectionReason: { type: String },
+  },
+  { _id: false }
+);
+
 const logisticsSchema = new mongoose.Schema(
   {
     driverName: { type: String, default: 'Unassigned' },
@@ -93,8 +108,12 @@ const wasteLotSchema = new mongoose.Schema(
       trim: true,
     },
     generatorId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.Mixed,
       ref: 'User',
+    },
+    generatorContact: {
+      type: String,
+      trim: true,
     },
     generatorName: {
       type: String,
@@ -133,6 +152,7 @@ const wasteLotSchema = new mongoose.Schema(
     },
     requestedFacilityId: { type: String },
     requestedFacilityName: { type: String },
+    requestedFacilities: [requestedFacilitySchema],
     rejectionReason: { type: String },
     gateArrivalTime: { type: String },
     matchedFacilityId: { type: String },

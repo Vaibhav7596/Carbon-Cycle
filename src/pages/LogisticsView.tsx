@@ -4,6 +4,7 @@ import { NetworkMap } from '../components/map/NetworkMap';
 import { updateLotLifecycleStatus, RoadRouteResult } from '../services/store';
 import { calculateHaversineDistanceKm, calculateTravelTimeMinutes, calculateTransportEmissionsCO2e } from '../utils/haversine';
 import { Truck, MapPin, Navigation, Clock, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface LogisticsViewProps {
   wasteLots: WasteLot[];
@@ -20,11 +21,35 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
   onSelectLot,
   onUpdateLotStatus,
 }) => {
+  const { user } = useAuth();
+  const isFacilityOperator = user?.role === 'facility_operator';
+
   // Select active lot (or default to first matched lot)
   const activeLot = wasteLots.find((l) => l.id === selectedLotId) || wasteLots.find((l) => l.matchedFacilityName) || wasteLots[0];
 
   if (!activeLot) {
-    return <div className="p-6">No waste lots available for logistics tracking.</div>;
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <h1 className="text-xl font-extrabold text-carbon-primary tracking-tight">Real-Time Waste Logistics & Transit</h1>
+            <p className="text-xs text-carbon-secondary">Telemetry, GIS route navigation, and weighbridge gate logs.</p>
+          </div>
+        </div>
+
+        <div className="p-12 text-center bg-surface border border-dashed border-border rounded-card space-y-4 max-w-xl mx-auto my-12">
+          <div className="w-12 h-12 rounded-full bg-surface-muted text-carbon-muted flex items-center justify-center mx-auto">
+            <Truck className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-carbon-primary">No Batches in Transit</h3>
+            <p className="text-xs text-carbon-secondary leading-relaxed">
+              No waste batches are currently logged or routed for logistics transit. Once a batch is registered and matched with a destination facility, real-time GPS transit tracking and weighbridge gate updates will appear here.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const { fingerprint, matchedFacilityName, matchedFacilityLocation, logistics, status } = activeLot;
@@ -50,8 +75,13 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
   const travelTimeMins = hasRoadRoute ? roadRoute!.durationMinutes : calculateTravelTimeMinutes(distanceKm);
   const transportEmissions = calculateTransportEmissionsCO2e(distanceKm, fingerprint?.quantityTonnes || 10);
 
+  // Moves from and after transit (IN_TRANSIT, AT_GATE, DELIVERED, PROCESSING) are restricted to facility operators only
+  const isFacilityControlledStatus = status === 'IN_TRANSIT' || status === 'AT_GATE' || status === 'DELIVERED' || status === 'PROCESSING';
+
   const handleNextStatus = async () => {
     if (isUpdating) return;
+    if (!isFacilityOperator && isFacilityControlledStatus) return;
+
     let nextSt: WasteStatus = 'PICKUP';
     if (status === 'MATCHED') nextSt = 'PICKUP';
     else if (status === 'PICKUP') nextSt = 'IN_TRANSIT';
@@ -170,7 +200,25 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
 
             {/* Lifecycle Action Button */}
             <div className="pt-2">
-              {status !== 'COMPLETED' ? (
+              {status === 'COMPLETED' ? (
+                <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-btn text-center font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                  <span>Batch Conversion Completed & Certified</span>
+                </div>
+              ) : isFacilityControlledStatus && !isFacilityOperator ? (
+                <div className="p-3 bg-surface-muted/90 border border-border/80 rounded-btn text-center space-y-1 shadow-xs">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-xs text-carbon-primary">
+                    <ShieldCheck className="w-4 h-4 text-brand-primary" />
+                    <span>Next Phase Controlled by Facility Hub</span>
+                  </div>
+                  <p className="text-[11px] text-carbon-secondary leading-relaxed">
+                    {status === 'IN_TRANSIT' && `Truck is in transit. Gate arrival will be recorded by ${matchedFacilityName || 'the facility operator'}.`}
+                    {status === 'AT_GATE' && `Truck is at gate. Weighbridge check-in and moisture verification are performed by ${matchedFacilityName || 'the facility operator'}.`}
+                    {status === 'DELIVERED' && `Feedstock delivered. Reactor feeding is initiated by ${matchedFacilityName || 'the facility operator'}.`}
+                    {status === 'PROCESSING' && `Conversion in progress. Digital impact certificate will be issued by ${matchedFacilityName || 'the facility operator'}.`}
+                  </p>
+                </div>
+              ) : (
                 <button
                   disabled={isUpdating}
                   onClick={handleNextStatus}
@@ -191,10 +239,6 @@ export const LogisticsView: React.FC<LogisticsViewProps> = ({
                     )}
                   </span>
                 </button>
-              ) : (
-                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-btn text-center font-bold text-xs">
-                  ✓ Batch Conversion Completed & Certified
-                </div>
               )}
             </div>
 

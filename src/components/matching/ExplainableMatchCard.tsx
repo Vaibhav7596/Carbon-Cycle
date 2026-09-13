@@ -10,6 +10,7 @@ interface ExplainableMatchCardProps {
   isRequested?: boolean;
   isMatched?: boolean;
   isRejected?: boolean;
+  isSuperseded?: boolean;
   rejectionReason?: string;
 }
 
@@ -21,6 +22,7 @@ export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
   isRequested = false,
   isMatched = false,
   isRejected = false,
+  isSuperseded = false,
   rejectionReason,
 }) => {
   const [showExplanation, setShowExplanation] = useState(isTopMatch);
@@ -180,10 +182,14 @@ export const ExplainableMatchCard: React.FC<ExplainableMatchCardProps> = ({
               <CheckCircle2 className="w-4 h-4 min-w-[16px] shrink-0 overflow-visible text-white" />
               <span>Intake Accepted & Scheduled</span>
             </div>
+          ) : isSuperseded ? (
+            <div className="w-full py-2.5 px-4 rounded-btn text-xs font-semibold flex items-center justify-center gap-2 bg-surface-muted text-carbon-muted border border-border">
+              <span>Batch Claimed by Earliest Accepting Plant</span>
+            </div>
           ) : isRequested ? (
             <div className="w-full py-2.5 px-4 rounded-btn text-xs font-bold flex items-center justify-center gap-2 bg-amber-500 text-white shadow-sm animate-pulse">
               <Clock className="w-4 h-4 min-w-[16px] shrink-0 text-white" />
-              <span>Intake Request Pending Facility Operator Review</span>
+              <span>Waiting for Plant Acceptance (Request Sent)</span>
             </div>
           ) : isRejected ? (
             <div className="space-y-2">

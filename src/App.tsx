@@ -155,6 +155,10 @@ function AppContent() {
   };
 
   const handleNotifyGateArrival = async (lotId: string) => {
+    if (user?.role !== 'facility_operator' && user?.role !== 'admin') {
+      showToast('Gate arrival can only be recorded by the facility operator.');
+      return;
+    }
     const updatedLot = await notifyGateArrivalApi(lotId);
     if (updatedLot) {
       setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
@@ -163,6 +167,11 @@ function AppContent() {
   };
 
   const handleUpdateLotStatus = async (lotId: string, newStatus: WasteStatus) => {
+    const facilityOnlyStatuses: WasteStatus[] = ['AT_GATE', 'DELIVERED', 'PROCESSING', 'COMPLETED'];
+    if (facilityOnlyStatuses.includes(newStatus) && user?.role !== 'facility_operator' && user?.role !== 'admin') {
+      showToast('Transitions from and after transit must be confirmed by the facility operator.');
+      return;
+    }
     const updatedLot = await updateLotLifecycleStatusApi(lotId, newStatus);
     if (updatedLot) {
       setWasteLots((prev) => prev.map((l) => (l.id === lotId ? updatedLot : l)));
@@ -185,6 +194,77 @@ function AppContent() {
   const hideNavbarTabs: NavTab[] = ['DASHBOARD', 'RECOMMENDATION', 'ADD_WASTE', 'CARBON', 'ANALYTICS'];
   const showTopbar = !hideNavbarTabs.includes(currentTab);
 
+  const isFacilityOperator = user?.role === 'facility_operator';
+  const isGenerator = user?.role === 'generator';
+  const isDemoFacilityUser = user?.email?.toLowerCase() === 'facility@carboncycle.io';
+  const isDemoGenerator = user?.email?.toLowerCase() === 'generator@carboncycle.io';
+
+  // Find the logged-in operator's facility
+  // For demo account: falls back to EcoChar. For newly registered operators: strictly matches their own facility or provides clean zero-state
+  const myFacility = isFacilityOperator
+    ? facilities.find((f) => user?.email && f.contactEmail?.toLowerCase() === user.email.toLowerCase()) ||
+      facilities.find((f) => (user?.id || (user as any)?._id) && (f.operatorId === user?.id || f.operatorId === (user as any)?._id)) ||
+      facilities.find((f) => user?.organizationName && (f.name.toLowerCase().includes(user.organizationName.toLowerCase().trim()) || user.organizationName.toLowerCase().includes(f.name.toLowerCase().trim()))) ||
+      (isDemoFacilityUser ? (facilities.find((f) => f.name.toLowerCase().includes('ecochar')) || facilities[0]) : null) ||
+      {
+        id: (user as any)?.facilityId || `FAC-${String(user?.id || user?.email || 'NEW').slice(-4).toUpperCase()}`,
+        name: user?.organizationName || `${user?.name || 'Operator'}'s Conversion Center`,
+        type: 'BIOCHAR' as const,
+        acceptedWasteTypes: ['AGRICULTURAL_RESIDUE', 'BIOMASS_WOOD'] as any[],
+        maxCapacityTonnes: 50.0,
+        availableCapacityTonnes: 50.0,
+        location: {
+          name: user?.organizationName || 'Regional Conversion Center',
+          address: user?.location || 'Gandhinagar Bio-Industrial Zone, Gujarat',
+          lat: 23.2156,
+          lng: 72.6369,
+        },
+        processingCostPerTon: 950,
+        carbonFactorPerTon: 0.45,
+        rating: 5.0,
+        contactEmail: user?.email,
+        operatorId: user?.id || (user as any)?._id,
+        activeBatchesCount: 0,
+        status: 'ACTIVE' as const,
+      }
+    : null;
+
+  // Lots strictly scoped to the logged-in facility operator
+  const facilityScopedLots = (isFacilityOperator && myFacility)
+    ? wasteLots.filter((l) => {
+        if (l.matchedFacilityId === myFacility.id) return true;
+        if (l.status === 'MATCH_REQUESTED') {
+          if (l.requestedFacilityId === myFacility.id) return true;
+          if (l.requestedFacilities && l.requestedFacilities.some((r) => r.facilityId === myFacility.id && r.status === 'PENDING')) return true;
+        }
+        return false;
+      })
+    : wasteLots;
+
+  // Facilities strictly scoped to the logged-in facility operator
+  const facilityScopedFacilities = (isFacilityOperator && myFacility)
+    ? (facilities.some((f) => f.id === myFacility.id) ? facilities.filter((f) => f.id === myFacility.id) : [myFacility])
+    : facilities;
+
+  // Lots strictly scoped to the logged-in generator (new generators have 0 lots until registered)
+  const generatorScopedLots = isGenerator
+    ? wasteLots.filter((l) => {
+        if (isDemoGenerator) return true;
+        const uId = String(user?.id || (user as any)?._id || '');
+        const lGenId = String(l.generatorId || '');
+        if (uId && lGenId && (lGenId === uId || lGenId.includes(uId) || uId.includes(lGenId))) return true;
+        const uOrg = user?.organizationName?.toLowerCase().trim();
+        const lGenName = l.generatorName?.toLowerCase().trim();
+        if (uOrg && lGenName && (lGenName === uOrg || lGenName.includes(uOrg) || uOrg.includes(lGenName))) return true;
+        const uName = user?.name?.toLowerCase().trim();
+        if (uName && lGenName && (lGenName === uName || lGenName.includes(uName) || uName.includes(lGenName))) return true;
+        const uEmail = user?.email?.toLowerCase().trim();
+        const lContact = l.generatorContact?.toLowerCase().trim();
+        if (uEmail && lContact && lContact === uEmail) return true;
+        return false;
+      })
+    : wasteLots;
+
   return (
     <div className="flex min-h-screen bg-canvas text-carbon-primary font-sans">
       
@@ -199,7 +279,13 @@ function AppContent() {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleNavigate}
-        activeWasteCount={wasteLots.length}
+        activeWasteCount={
+          isFacilityOperator
+            ? facilityScopedLots.length
+            : isGenerator
+            ? generatorScopedLots.length
+            : wasteLots.length
+        }
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
@@ -245,7 +331,7 @@ function AppContent() {
               />
             ) : (
               <DashboardView
-                wasteLots={wasteLots}
+                wasteLots={isGenerator ? generatorScopedLots : wasteLots}
                 facilities={facilities}
                 onSelectTab={handleNavigate}
                 onSelectLot={(id) => {
@@ -259,7 +345,7 @@ function AppContent() {
 
           {currentTab === 'WASTE' && (
             <WasteListView
-              wasteLots={wasteLots}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
               onSelectLot={(id) => {
                 setSelectedLotId(id);
                 setCurrentTab('RECOMMENDATION');
@@ -297,8 +383,8 @@ function AppContent() {
 
           {currentTab === 'LOGISTICS' && (
             <LogisticsView
-              wasteLots={wasteLots}
-              facilities={facilities}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
+              facilities={isFacilityOperator ? facilityScopedFacilities : facilities}
               selectedLotId={selectedLotId}
               onSelectLot={setSelectedLotId}
               onUpdateLotStatus={handleUpdateLotStatus}
@@ -307,7 +393,7 @@ function AppContent() {
 
           {currentTab === 'PROCESSING' && (
             <ProcessingQueueView
-              wasteLots={wasteLots}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
               onUpdateLotStatus={handleUpdateLotStatus}
               onOpenReport={(lot) => setOpenReportLot(lot)}
               searchQuery={searchQuery}
@@ -316,21 +402,21 @@ function AppContent() {
 
           {currentTab === 'CARBON' && (
             <CarbonImpactView
-              wasteLots={wasteLots}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
               onOpenReport={(lot) => setOpenReportLot(lot)}
             />
           )}
 
           {currentTab === 'ANALYTICS' && (
             <AnalyticsView
-              wasteLots={wasteLots}
-              facilities={facilities}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
+              facilities={isFacilityOperator ? facilityScopedFacilities : facilities}
             />
           )}
 
           {currentTab === 'REPORTS' && (
             <ReportsView
-              wasteLots={wasteLots}
+              wasteLots={isFacilityOperator ? facilityScopedLots : (isGenerator ? generatorScopedLots : wasteLots)}
               onOpenReport={(lot) => setOpenReportLot(lot)}
               searchQuery={searchQuery}
             />

@@ -1,3 +1,5 @@
+import { FacilityRegistrationProfile } from '../types';
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -28,6 +30,7 @@ export async function registerApi(data: {
   organizationType?: string;
   location?: string;
   role?: string;
+  facilityProfile?: FacilityRegistrationProfile;
 }): Promise<AuthResponse> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/register`, {

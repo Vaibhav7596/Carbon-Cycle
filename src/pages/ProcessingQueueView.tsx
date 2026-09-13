@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { WasteLot, WasteStatus } from '../types';
 import { Cpu, CheckCircle2, Clock, Play, ChevronDown, ChevronUp, FileText, ArrowUpRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface ProcessingQueueViewProps {
   wasteLots: WasteLot[];
@@ -15,6 +16,9 @@ export const ProcessingQueueView: React.FC<ProcessingQueueViewProps> = ({
   onOpenReport,
   searchQuery = '',
 }) => {
+  const { user } = useAuth();
+  const isFacilityOperator = user?.role === 'facility_operator';
+
   const [expanded, setExpanded] = useState<{
     incoming: boolean;
     processing: boolean;
@@ -124,13 +128,20 @@ export const ProcessingQueueView: React.FC<ProcessingQueueViewProps> = ({
                       <div className="text-[10px] text-carbon-muted">
                         Destination: <span className="font-semibold text-carbon-primary">{lot.matchedFacilityName || 'Assigned Hub'}</span>
                       </div>
-                      <button
-                        onClick={() => onUpdateLotStatus(lot.id, 'PROCESSING')}
-                        className="w-full bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                        <span>Load into Reactor / Digester</span>
-                      </button>
+                      {isFacilityOperator ? (
+                        <button
+                          onClick={() => onUpdateLotStatus(lot.id, 'PROCESSING')}
+                          className="w-full bg-brand-primary hover:bg-brand-dark text-white text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Load into Reactor / Digester</span>
+                        </button>
+                      ) : (
+                        <div className="w-full bg-surface-muted border border-border text-carbon-secondary text-[11px] font-semibold py-2 rounded-xl text-center flex items-center justify-center gap-1.5 shadow-xs">
+                          <Clock className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Awaiting Reactor Loading by Facility</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -214,13 +225,20 @@ export const ProcessingQueueView: React.FC<ProcessingQueueViewProps> = ({
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => onUpdateLotStatus(lot.id, 'COMPLETED')}
-                          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Complete & Record Impact</span>
-                        </button>
+                        {isFacilityOperator ? (
+                          <button
+                            onClick={() => onUpdateLotStatus(lot.id, 'COMPLETED')}
+                            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Complete & Record Impact</span>
+                          </button>
+                        ) : (
+                          <div className="w-full bg-surface-muted border border-border text-carbon-secondary text-[11px] font-semibold py-2 rounded-xl text-center flex items-center justify-center gap-1.5 shadow-xs">
+                            <Cpu className="w-3.5 h-3.5 text-brand-primary animate-pulse" />
+                            <span>Active Conversion Managed by Facility</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -39,6 +39,36 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
   const topMatch = matchedResults[0];
   const alternativeMatches = matchedResults.slice(1);
 
+  // Multi-request status helpers (Item 8)
+  const isFacilityRequested = (facId: string) => {
+    if (lot.requestedFacilities && lot.requestedFacilities.length > 0) {
+      const entry = lot.requestedFacilities.find((r) => r.facilityId === facId);
+      if (entry && entry.status === 'PENDING') return true;
+    }
+    return lot.status === 'MATCH_REQUESTED' && (lot.requestedFacilityId === facId);
+  };
+
+  const isFacilityMatched = (facId: string) => {
+    return lot.matchedFacilityId === facId && lot.status !== 'REJECTED';
+  };
+
+  const isFacilityRejected = (facId: string) => {
+    if (lot.requestedFacilities && lot.requestedFacilities.length > 0) {
+      const entry = lot.requestedFacilities.find((r) => r.facilityId === facId);
+      if (entry && entry.status === 'REJECTED') return true;
+    }
+    return lot.status === 'REJECTED' && lot.requestedFacilityId === facId;
+  };
+
+  const isFacilitySuperseded = (facId: string) => {
+    if (lot.status === 'MATCHED' && lot.matchedFacilityId && lot.matchedFacilityId !== facId) return true;
+    if (lot.requestedFacilities && lot.requestedFacilities.length > 0) {
+      const entry = lot.requestedFacilities.find((r) => r.facilityId === facId);
+      if (entry && entry.status === 'SUPERSEDED') return true;
+    }
+    return false;
+  };
+
   // Pathways to show based on toggle
   const visiblePathways = showAllPathways
     ? pathwaySuitabilities
@@ -243,9 +273,10 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
               match={topMatch}
               isTopMatch={true}
               lotStatus={lot.status}
-              isRequested={lot.status === 'MATCH_REQUESTED' && (lot.requestedFacilityId === topMatch.facility.id || lot.requestedFacilityName === topMatch.facility.name)}
-              isMatched={lot.matchedFacilityId === topMatch.facility.id && lot.status !== 'REJECTED'}
-              isRejected={lot.status === 'REJECTED' && lot.requestedFacilityId === topMatch.facility.id}
+              isRequested={isFacilityRequested(topMatch.facility.id)}
+              isMatched={isFacilityMatched(topMatch.facility.id)}
+              isRejected={isFacilityRejected(topMatch.facility.id)}
+              isSuperseded={isFacilitySuperseded(topMatch.facility.id)}
               rejectionReason={lot.rejectionReason}
               onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
             />
@@ -297,9 +328,10 @@ export const WasteIntelligenceView: React.FC<WasteIntelligenceViewProps> = ({
                         match={altMatch}
                         isTopMatch={false}
                         lotStatus={lot.status}
-                        isRequested={lot.status === 'MATCH_REQUESTED' && (lot.requestedFacilityId === altMatch.facility.id || lot.requestedFacilityName === altMatch.facility.name)}
-                        isMatched={lot.matchedFacilityId === altMatch.facility.id && lot.status !== 'REJECTED'}
-                        isRejected={lot.status === 'REJECTED' && lot.requestedFacilityId === altMatch.facility.id}
+                        isRequested={isFacilityRequested(altMatch.facility.id)}
+                        isMatched={isFacilityMatched(altMatch.facility.id)}
+                        isRejected={isFacilityRejected(altMatch.facility.id)}
+                        isSuperseded={isFacilitySuperseded(altMatch.facility.id)}
                         rejectionReason={lot.rejectionReason}
                         onSelectFacility={(facId) => onConfirmMatch(lot.id, facId)}
                       />

@@ -110,15 +110,24 @@ exports.createWasteLot = async (req, res, next) => {
       },
     ];
 
+    const generatorId = (req.user && (req.user._id || req.user.id)) || req.body.generatorId;
+    const generatorContact = req.user?.email || req.body.generatorContact;
+    const finalGenName = generatorName || req.user?.organizationName || req.user?.name || 'Regional Agro Generator';
+    const finalGenType = generatorType || req.user?.organizationType || 'Agricultural Enterprise';
+
+    const initialImpact = calculateBatchImpact(fingerprint, recommendedPathway, 15);
+
     const newLot = await WasteLot.create({
       id: newId,
-      generatorId: req.user?._id,
-      generatorName: generatorName || req.user?.organizationName || 'Regional Agro Generator',
-      generatorType: generatorType || req.user?.organizationType || 'Agricultural Enterprise',
+      generatorId: generatorId || undefined,
+      generatorContact: generatorContact || undefined,
+      generatorName: finalGenName,
+      generatorType: finalGenType,
       fingerprint,
       status: 'LISTED',
       selectedPathway: recommendedPathway,
       timeline: initialTimeline,
+      impactMetrics: initialImpact,
     });
 
     res.status(201).json({
@@ -156,6 +165,13 @@ exports.matchFacility = async (req, res, next) => {
       });
     }
 
+    if (['MATCHED', 'PICKUP', 'IN_TRANSIT', 'AT_GATE', 'DELIVERED', 'PROCESSING', 'COMPLETED'].includes(lot.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Batch ${lot.id} is already matched to ${lot.matchedFacilityName || 'another facility'} and cannot accept new requests.`,
+      });
+    }
+
     const facQuery = facilityId.startsWith('FAC-') ? { id: facilityId } : { _id: facilityId };
     const targetFacility = await Facility.findOne(facQuery);
 
@@ -177,7 +193,33 @@ exports.matchFacility = async (req, res, next) => {
     const impact = calculateBatchImpact(lot.fingerprint, pathway, distance);
     const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
 
-    // Update lot state to MATCH_REQUESTED
+    // Multi-facility request management: add or update candidate facility
+    if (!lot.requestedFacilities) {
+      lot.requestedFacilities = [];
+    }
+
+    const existingReq = lot.requestedFacilities.find((r) => r.facilityId === targetFacility.id);
+    if (existingReq) {
+      if (existingReq.status === 'PENDING') {
+        return res.status(200).json({
+          success: true,
+          message: `Intake request is already pending with ${targetFacility.name}`,
+          lot,
+        });
+      }
+      existingReq.status = 'PENDING';
+      existingReq.requestedAt = dateStr;
+      existingReq.rejectionReason = undefined;
+    } else {
+      lot.requestedFacilities.push({
+        facilityId: targetFacility.id,
+        facilityName: targetFacility.name,
+        status: 'PENDING',
+        requestedAt: dateStr,
+      });
+    }
+
+    // Update lot state to MATCH_REQUESTED (displayed as WAITING to generator)
     lot.requestedFacilityId = targetFacility.id;
     lot.requestedFacilityName = targetFacility.name;
     lot.selectedPathway = pathway;
@@ -188,7 +230,7 @@ exports.matchFacility = async (req, res, next) => {
     lot.timeline.push({
       status: 'MATCH_REQUESTED',
       timestamp: dateStr,
-      note: `Intake match request sent to ${targetFacility.name}`,
+      note: `Intake match request sent to ${targetFacility.name} (Waiting for acceptance)`,
     });
 
     await lot.save();
@@ -218,7 +260,7 @@ exports.matchFacility = async (req, res, next) => {
       recipientRole: 'generator',
       lotId: lot.id,
       title: 'Intake Request Submitted',
-      message: `Intake request for batch ${lot.id} sent to ${targetFacility.name}. Awaiting facility operator acceptance.`,
+      message: `Intake request for batch ${lot.id} sent to ${targetFacility.name}. Status: Waiting for facility operator response.`,
       type: 'INFO',
       actionTab: 'WASTE',
     });
@@ -257,17 +299,25 @@ exports.respondToMatchRequest = async (req, res, next) => {
       });
     }
 
-    // Guard: don't re-accept lots already in processing or completed
-    if (['PROCESSING', 'COMPLETED', 'IN_TRANSIT', 'PICKUP', 'DELIVERED'].includes(lot.status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Batch ${lot.id} is already in status ${lot.status} and cannot be re-accepted.`,
-      });
-    }
-
     const facId = facilityId || lot.requestedFacilityId || lot.matchedFacilityId;
     const targetFacility = facId ? await Facility.findOne({ id: facId }) : null;
     const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+
+    // Guard: First accepted wins! If already matched to another facility, reject subsequent attempts
+    if (lot.status === 'MATCHED' && lot.matchedFacilityId && targetFacility && lot.matchedFacilityId !== targetFacility.id) {
+      return res.status(400).json({
+        success: false,
+        message: `Batch ${lot.id} has already been accepted by another facility (${lot.matchedFacilityName || lot.matchedFacilityId}). Earliest acceptance takes precedence.`,
+      });
+    }
+
+    // Guard: don't re-accept lots already in advanced processing or completed
+    if (['PROCESSING', 'COMPLETED', 'IN_TRANSIT', 'PICKUP', 'DELIVERED'].includes(lot.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Batch ${lot.id} is already in status ${lot.status} and cannot be modified.`,
+      });
+    }
 
     if (action === 'ACCEPT') {
       const distance = targetFacility
@@ -282,6 +332,7 @@ exports.respondToMatchRequest = async (req, res, next) => {
       const pathway = targetFacility?.type || lot.selectedPathway || 'BIOCHAR';
       const impact = calculateBatchImpact(lot.fingerprint, pathway, distance);
 
+      // Lock to this accepting facility
       lot.status = 'MATCHED';
       lot.matchedFacilityId = targetFacility?.id || facId;
       lot.matchedFacilityName = targetFacility?.name || lot.requestedFacilityName;
@@ -289,9 +340,17 @@ exports.respondToMatchRequest = async (req, res, next) => {
       lot.matchedFacilityLocation = targetFacility?.location;
       lot.selectedPathway = pathway;
       lot.rejectionReason = undefined;
-      // Clear the pending request once accepted
-      lot.requestedFacilityId = undefined;
-      lot.requestedFacilityName = undefined;
+
+      // Update requestedFacilities array: mark this as ACCEPTED, others as SUPERSEDED
+      if (lot.requestedFacilities && lot.requestedFacilities.length > 0) {
+        lot.requestedFacilities.forEach((r) => {
+          if (r.facilityId === (targetFacility?.id || facId)) {
+            r.status = 'ACCEPTED';
+          } else if (r.status === 'PENDING') {
+            r.status = 'SUPERSEDED';
+          }
+        });
+      }
 
       const randomTruckSuffix = Math.floor(1000 + Math.random() * 9000);
       lot.logistics = {
@@ -377,40 +436,56 @@ exports.respondToMatchRequest = async (req, res, next) => {
     if (action === 'REJECT') {
       const reason = rejectionReason || 'Facility intake capacity limits reached';
 
-      lot.status = 'REJECTED';
-      lot.rejectionReason = reason;
-      lot.matchedFacilityId = undefined;
-      lot.matchedFacilityName = undefined;
+      // Mark this facility's request as REJECTED in requestedFacilities
+      let hasOtherPending = false;
+      if (lot.requestedFacilities && lot.requestedFacilities.length > 0) {
+        lot.requestedFacilities.forEach((r) => {
+          if (r.facilityId === facId) {
+            r.status = 'REJECTED';
+            r.rejectionReason = reason;
+          } else if (r.status === 'PENDING') {
+            hasOtherPending = true;
+          }
+        });
+      }
+
+      // If other requests are still pending, maintain MATCH_REQUESTED; otherwise mark REJECTED
+      if (hasOtherPending) {
+        lot.status = 'MATCH_REQUESTED';
+      } else {
+        lot.status = 'REJECTED';
+        lot.rejectionReason = reason;
+      }
 
       lot.timeline.push({
         status: 'REJECTED',
         timestamp: dateStr,
-        note: `Intake request declined by ${lot.requestedFacilityName || 'Facility'}: ${reason}`,
+        note: `Intake request declined by ${targetFacility?.name || lot.requestedFacilityName || 'Facility'}: ${reason}`,
       });
 
       await lot.save();
 
-      // Notify Generator of Rejection with alternative selection prompt
+      // Notify Generator of Rejection
       await Notification.create({
         recipientRole: 'generator',
         lotId: lot.id,
         title: 'Intake Request Declined',
-        message: `${lot.requestedFacilityName || 'Facility'} declined batch ${lot.id} (${reason}). You can now select an alternative compatible facility.`,
+        message: `${targetFacility?.name || lot.requestedFacilityName || 'Facility'} declined batch ${lot.id} (${reason}). ${hasOtherPending ? 'Other facility requests are still pending.' : 'You can now select an alternative compatible facility.'}`,
         type: 'MATCH_REJECTED',
         actionTab: 'RECOMMENDATION',
         metadata: {
           rejectionReason: reason,
-          declinedBy: lot.requestedFacilityName,
+          declinedBy: targetFacility?.name || lot.requestedFacilityName,
         },
       });
 
       // Notify Facility Operator
       await Notification.create({
         recipientRole: 'facility_operator',
-        recipientFacilityId: lot.requestedFacilityId,
+        recipientFacilityId: facId,
         lotId: lot.id,
         title: 'Intake Request Declined',
-        message: `You declined batch ${lot.id} (${reason}). Generator has been notified to select an alternative facility.`,
+        message: `You declined batch ${lot.id} (${reason}). Generator has been notified.`,
         type: 'INFO',
         actionTab: 'DASHBOARD',
       });
